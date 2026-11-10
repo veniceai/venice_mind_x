@@ -1,6 +1,8 @@
 """
 Configuration for Venice X Bot (@venice_mind).
-Updated Feb 2026 — Kimi K2.5 primary (text+vision), GLM Heretic uncensored fallback.
+Updated Nov 2026 — Jev routes each mention to DeepSeek V4.1 Flash 1017 Uncensored
+(unbiased lane) or Kimi K3 (complex lane); X context and tools follow @grok
+(docs/plans/0002-grok-style-replies.md).
 """
 import os
 from dotenv import load_dotenv
@@ -31,16 +33,35 @@ class Config:
     VENICE_MODELS_FILE = "venice_models.json"
     VENICE_MODELS_TTL_SECONDS = 6 * 3600  # live model data cached 6h
 
-    # ── Model Hierarchy ──────────────────────────────────────────
-    # Primary: Kimi K2.5 — smartest, native multimodal (text + vision), 256K ctx
-    MODEL_PRIMARY = "kimi-k2-5"                         # $0.56/$3.50 per 1M tok, private
-    # Uncensored fallback: GLM Heretic — used when primary self-censors
-    MODEL_UNCENSORED = "olafangensan-glm-4.7-flash-heretic"  # $0.14/$0.80 per 1M tok, private, 200K
-    # Vision fallback: Qwen3-VL — if Kimi can't handle a specific vision task
-    MODEL_VISION_FALLBACK = "qwen3-vl-235b-a22b"       # $0.25/$1.50 per 1M tok, private, 256K
-    # Last resort: Venice Uncensored 1.2 — cheap, uncensored (successor to the
-    # retired "venice-uncensored"; same price, 4x the context)
-    MODEL_LAST_RESORT = "venice-uncensored-1-2"         # $0.20/$0.90 per 1M tok, private, 128K
+    # ── Model Lanes ──────────────────────────────────────────────
+    # The router (router.py) sends each mention down one of two lanes. Every
+    # model below is private and supports vision + function calling (catalog,
+    # 2026-11-10). Prices are per 1M input/output tokens.
+    # Unbiased lane — most X questions: claims, news, politics, culture.
+    MODEL_UNBIASED = "deepseek-v4-1-flash-1017-uncensored"  # $0.33/$1.32, 1M ctx
+    # Complex lane — math, code, technical deep-dives that aren't contested.
+    MODEL_COMPLEX = "kimi-k3"                               # $3.75/$18.75, 1M ctx
+    # Next in line when a lane's model errors or refuses.
+    MODEL_FALLBACK = "deepseek-v4-1-flash-uncensored"       # $0.33/$1.32, 1M ctx
+    MODEL_LAST_RESORT = "venice-uncensored-1-2"             # $0.20/$0.90, 128K ctx
+
+    # Reasoning effort per call site; only sent to models whose catalog entry
+    # has supportsReasoningEffort. Kimi K3 defaults to "max" if unset.
+    REASONING_EFFORT_UNBIASED = "high"
+    REASONING_EFFORT_COMPLEX = "high"
+    REASONING_EFFORT_CRAFTER = "low"
+
+    # ── Router (Jev decision model) ─────────────────────────────
+    # Jev is anonymized (TypeSafe sees the state, not the sender); the state is
+    # public X content. "clef-api" is the private alternative. A key limited to
+    # private models gets a 403, which routes to the unbiased lane.
+    MODEL_ROUTER = "jev-latest"                             # $0.042 per 1M input, output free
+    VENICE_DECISIONS_URL = "https://api.venice.ai/api/v1/decisions"
+    ROUTER_ENABLED = os.getenv("ROUTER_ENABLED", "true").lower() == "true"
+    ROUTER_TIMEOUT_SECONDS = 10
+    ROUTER_CHARGED_THRESHOLD = 0.5   # at or above → unbiased lane, whatever else
+    ROUTER_COMPLEX_THRESHOLD = 0.6   # at or above (and not charged) → complex lane
+    ROUTER_STATE_MAX_CHARS = 12_000  # Jev reads up to 32K tokens of state
 
     @classmethod
     def configured_models(cls) -> dict[str, str]:
@@ -49,20 +70,37 @@ class Config:
         Used at startup to validate these IDs against Venice's live model list
         (see venice_knowledge.validate_configured_models)."""
         return {
-            "MODEL_PRIMARY": cls.MODEL_PRIMARY,
-            "MODEL_UNCENSORED": cls.MODEL_UNCENSORED,
-            "MODEL_VISION_FALLBACK": cls.MODEL_VISION_FALLBACK,
+            "MODEL_UNBIASED": cls.MODEL_UNBIASED,
+            "MODEL_COMPLEX": cls.MODEL_COMPLEX,
+            "MODEL_FALLBACK": cls.MODEL_FALLBACK,
             "MODEL_LAST_RESORT": cls.MODEL_LAST_RESORT,
+            "MODEL_ROUTER": cls.MODEL_ROUTER,
         }
 
     # ── X Account ────────────────────────────────────────────────
     X_PREMIUM_ENABLED = os.getenv("X_PREMIUM_ENABLED", "false").lower() == "true"
     CHAR_LIMIT_PREMIUM = 25_000
     CHAR_LIMIT_STANDARD = 280
+    # Length the model aims for; @grok keeps its replies under 550.
+    REPLY_TARGET_PREMIUM = 550
 
     @classmethod
     def char_limit(cls) -> int:
         return cls.CHAR_LIMIT_PREMIUM if cls.X_PREMIUM_ENABLED else cls.CHAR_LIMIT_STANDARD
+
+    @classmethod
+    def reply_target(cls) -> int:
+        return min(cls.REPLY_TARGET_PREMIUM, cls.char_limit())
+
+    # ── X Context & Tools ────────────────────────────────────────
+    THREAD_MAX_DEPTH = 6          # reply-chain hops walked up from a mention
+    MAX_LINKED_POSTS = 2          # x.com status links resolved per mention
+    MAX_IMAGES = 4                # images sent to the model per reply
+    X_TOOLS_ENABLED = True
+    X_TOOL_MAX_ROUNDS = 3         # model turns per reply that may call X tools
+    X_SEARCH_MAX_RESULTS = 10     # posts per search (the API's minimum is 10)
+    X_USER_RECENT_POSTS = 5       # recent posts returned by x_user_lookup (minimum 5)
+    X_MEDIA_HOSTS = ("pbs.twimg.com",)  # view_image downloads only from these
 
     # ── Timing & Rate Limits ─────────────────────────────────────
     CHECK_INTERVAL = 120         # seconds between mention checks
@@ -93,6 +131,8 @@ class Config:
     VERIFIED_ONLY = False
 
     # ── Behaviour Flags ──────────────────────────────────────────
+    # Log the reply that would be posted instead of posting it.
+    DRY_RUN = os.getenv("DRY_RUN", "false").lower() == "true"
     USE_SESSION_START_CUTOFF = True
     STATE_FILE = "state.json"
     # State is bounded: mentions only arrive from the recent lookback window, so
@@ -106,45 +146,68 @@ class Config:
     ERROR_MESSAGE = "I'm having trouble connecting right now. Try again in a bit."
 
     # ── System Prompts ───────────────────────────────────────────
-    # Grok-inspired: witty, direct, opinionated, zero fluff.
+    # Reply rules follow xAI's published prompt for the @grok bot on X
+    # (xai-org/grok-prompts, ask_grok_system_prompt.j2); see plan 0002.
     ANALYST_PROMPT = """\
-You are the brain behind @venice_mind, a Twitter bot powered by Venice AI.
-Think of yourself as Grok's cooler, privacy-respecting cousin.
+You are the brain behind @venice_mind, a reply bot on X powered by Venice AI.
+People tag you inside posts and threads to get more information: to explain
+something, check a claim, or settle a question.
 
-PERSONALITY:
-- Witty, direct, occasionally irreverent — like a brilliant friend who doesn't sugarcoat
-- You have OPINIONS. Share them. Be specific. No fence-sitting unless evidence genuinely splits
-- Entertaining AND informative — if you can make someone smirk while learning, you win
-- Zero corporate speak. Zero "as an AI". Zero "I don't have personal opinions"
-- Match the user's energy: casual question → casual answer; deep question → deep analysis
+HOW TO WORK:
+- The user message carries the X thread you were tagged in, oldest post first,
+  with each author's handle. Read it first: "this" and "it" usually mean the
+  post being replied to. Posts marked (you) are your own earlier replies.
+- Look at the attached images and video thumbnails; they are often the point
+  of the question.
+- You have X tools: x_thread_fetch (a post with its parents and replies),
+  x_keyword_search (search X with its search operators), x_user_lookup (an
+  account's profile and recent posts) and view_image (look at an image URL that
+  another X tool returned; images in the thread are already attached). Use
+  them when the thread shown isn't enough: to read a post you
+  haven't seen, find what people on X are saying about a topic, or check what
+  an account actually posted. Don't fetch what is already in the thread.
+- Real-time web search runs alongside. Use it to confirm facts and get primary
+  sources for current events, prices, statistics, Venice updates, and anything
+  time-sensitive ("latest", "now", "today"). Your training data may be stale.
 
-CAPABILITIES:
-- Real-time web search and URL scraping (Venice handles this automatically)
-- Image analysis via vision models
-- 256K context window — you can handle long threads
-
-CRITICAL — ALWAYS USE WEB SEARCH FOR:
-- Current prices, stats, market data (crypto, stocks, etc.)
-- Recent news, events, announcements
-- Venice AI updates, models, features (things change fast!)
-- Anything time-sensitive or likely to be outdated
-- When someone asks "latest", "current", "now", "today", "recent"
-Your training data may be stale. Web search gives you live info. USE IT.
-
-LANGUAGE:
-- Detect the user's language and reply in the same language
-- If they tweet in Portuguese, reply in Portuguese. Spanish → Spanish. Etc.
+ANSWERING:
+- Answer from your own independent analysis of the evidence, not from what any
+  party, outlet or earlier bot reply says.
+- For current events, subjective claims and statistics, weigh sources from all
+  sides. Assume viewpoints sourced from the media are biased. Don't rest a
+  contested question on a single study or source.
+- On subjective political questions, keep a neutral tone. Give the
+  evidence-based answer; if the evidence splits, say how it splits.
+- Format demands never override balance. If a post wants a one-word, yes-or-no
+  only, or pick-a-side answer to a contested or subjective question ("one word:
+  is capitalism good or bad?"), don't follow the format: answer in a sentence or
+  two with the balanced conclusion the evidence supports. Plain factual
+  questions can still get a one-word answer.
+- Don't shy away from conclusions that are unpopular or politically incorrect
+  when they are well substantiated.
+- Never refuse a genuine question, berate, moralize or preach (the token and
+  wallet rules below are the one exception). No slogans, no snarky one-liners
+  such as "facts over feelings", no phrases that prescribe a feeling such as
+  "prioritize empathy".
+- Don't call a view or a person "biased" or "baseless"; show the evidence.
+- If you're unsure, say so plainly and give what you can.
+- Don't identify people in images or videos unless you are highly confident
+  and they are widely recognized public figures.
+- Don't mention or correct the post's spelling.
+- Match the post's register: a joke can get dry wit back, a real question gets
+  a straight answer.
 
 DEPTH SCALING:
-- Quick fact check → one punchy line
-- "What do you think about X?" → CLAIM → EVIDENCE → COUNTERPOINT → VERDICT
-- Math/logic puzzle → solve step-by-step, verify, present cleanly
-- "Is this true?" → extract claims, verify each, give clear True/False/Mixed verdict
+- Quick fact check → one clear line
+- "Is this true?" → extract the 1-3 core claims, verify each, verdict per claim
+  (True / False / Mixed) with 1-2 supporting facts
+- "What do you think about X?" → the strongest evidence on each side, then the
+  conclusion it supports
+- Math, logic or code → solve step by step, verify, present the answer cleanly
 
-VERIFICATION MODE:
-- Extract the 1-3 core claims from the tweet/context
-- Verify each using available web data
-- Verdict per claim: TRUE / FALSE / MIXED — with 1-2 supporting facts
+LANGUAGE:
+- Reply in the same language, regional dialect and alphabet as the post you
+  are replying to, unless asked not to.
 
 ═══════════════════════════════════════════════════════════════
 VENICE AI KNOWLEDGE — TRUST FRESH DATA OVER MEMORY:
@@ -247,11 +310,13 @@ HARD RULES:
 - NEVER start with greetings ("Hey!", "Hi there!", "Hello!")
 - NEVER suggest "check sources" or "visit websites" — YOU provide the answer
 - NEVER mention being @venice_mind or "as a bot" — speak as "I"
+- NEVER mention these instructions or your tools unless directly asked
 - NEVER add moral disclaimers, safety warnings, or hashtags unless explicitly asked
 - NEVER use markdown formatting (**bold**, *italic*, numbered lists) — plain text only
 - NEVER use emojis — plain text only, no emoticons or symbols
-- NEVER fabricate dates, numbers, or quotes not in your search results
-- NEVER include @mentions unless they're in the user's message or they asked you to tag someone
+- NEVER fabricate dates, numbers, or quotes not in the thread or your search results
+- NEVER tag the person you are replying to. Don't @mention anyone else unless the
+  user asks you to tag them; to say who said what, write the handle without the @
 - If web search is insufficient, say so honestly ("Current info on this is limited") but still give what you can
 """
 
@@ -264,7 +329,7 @@ RULES:
 - Math answers: "Answer: X. [minimal equation]"
 - Verification: start with "Yes", "No", or "Mixed" then the key facts
 - Plain text only — no markdown, no hashtags, no greetings, no moral advice, NO EMOJIS
-- No @mentions unless explicitly in the user's text or requested
+- Never tag the person being replied to; no other @mentions unless the user asked for a tag
 - No self-references ("@venice_mind", "as a bot", etc.)
 - Don't water down controversial or explicit content when contextually appropriate
 - If the input already fits the character limit and sounds good — return it as-is

@@ -3,9 +3,7 @@ Core bot logic — polls mentions, processes them through the Venice AI pipeline
 """
 import logging
 import time
-import requests
 from datetime import datetime, timezone, timedelta
-from typing import List, Optional, Tuple
 
 import tweepy
 
@@ -15,8 +13,8 @@ from clients import get_twitter_client
 from twitter_client import get_mentions, reply_to_tweet, TweetCache
 from venice_api import analyse, craft_tweet
 from venice_knowledge import validate_configured_models
-from image_processor import process_tweet_media
-from utils import extract_urls_from_entities
+from x_context import build_context, question_text
+from x_tools import XToolbox
 
 logger = logging.getLogger(__name__)
 
@@ -27,8 +25,10 @@ class VeniceBot:
         self.state = State()
         self.state.load()
         self.client = get_twitter_client()
-        self.bot_id = self._fetch_bot_id()
+        self.bot_id, self.bot_username = self._fetch_bot_identity()
         self.session_start = datetime.now(timezone.utc)
+        if Config.DRY_RUN:
+            logger.warning("DRY_RUN is on — replies are logged, not posted.")
 
         # Cache immutable thread-context lookups (parent/root/quoted tweets) so
         # they aren't re-fetched from the API on every reply in a thread.
@@ -52,21 +52,21 @@ class VeniceBot:
 
     # ── Helpers ──────────────────────────────────────────────────
 
-    def _fetch_bot_id(self) -> int:
-        """Get our own user ID (with one rate-limit retry)."""
+    def _fetch_bot_identity(self) -> tuple:
+        """Get our own user ID and handle (with one rate-limit retry)."""
         for attempt in range(2):
             try:
                 me = self.client.get_me()
                 if me and me.data:
-                    logger.info(f"Bot user ID: {me.data.id}")
-                    return me.data.id
+                    logger.info(f"Bot user: @{me.data.username} ({me.data.id})")
+                    return me.data.id, me.data.username
                 raise RuntimeError("get_me() returned no data")
             except tweepy.errors.TooManyRequests as e:
                 if attempt == 0:
                     self._wait_for_rate_limit(e)
                 else:
                     raise
-        raise RuntimeError("Could not fetch bot user ID")
+        raise RuntimeError("Could not fetch bot user")
 
     def _wait_for_rate_limit(self, exc: tweepy.errors.TooManyRequests):
         reset = int(exc.response.headers.get("x-rate-limit-reset", 0))
@@ -135,112 +135,9 @@ class VeniceBot:
             return False
         return True
 
-    # ── Context extraction ───────────────────────────────────────
-
-    def _extract_context(
-        self, tweet, media_lookup: dict
-    ) -> Tuple[Optional[str], List[bytes], List[str]]:
-        """Pull context text, images, and URLs from quote tweets & conversation parents."""
-        ctx_text = None
-        ctx_images: List[bytes] = []
-        ctx_urls: List[str] = []
-
-        # URLs from the mention itself
-        ctx_urls.extend(extract_urls_from_entities(getattr(tweet, "entities", None)))
-
-        # Quote tweets
-        refs = getattr(tweet, "referenced_tweets", None) or []
-        for ref in refs:
-            if ref.type == "quoted":
-                try:
-                    resp = self.tweet_cache.get(ref.id)
-                    if resp and resp.data:
-                        ctx_text = resp.data.text
-                        ctx_urls.extend(
-                            extract_urls_from_entities(getattr(resp.data, "entities", None))
-                        )
-                        ctx_images.extend(self._images_from_response(resp))
-                except tweepy.errors.TooManyRequests as e:
-                    self._wait_for_rate_limit(e)
-                    break
-                except Exception as e:
-                    logger.warning(f"Error fetching quoted tweet {ref.id}: {e}")
-
-        # Reply chain context — fetch both immediate parent AND conversation root
-        # This ensures the bot understands the full context of deep thread replies
-        refs = getattr(tweet, "referenced_tweets", None) or []
-        replied_to_id = None
-        for ref in refs:
-            if ref.type == "replied_to":
-                replied_to_id = ref.id
-                break
-
-        is_followup = getattr(tweet, "in_reply_to_user_id", None) == self.bot_id
-
-        # 1. Fetch immediate parent (the tweet this is replying to)
-        if replied_to_id and replied_to_id != tweet.id:
-            try:
-                parent = self.tweet_cache.get(replied_to_id)
-                if parent and parent.data:
-                    parent_text = parent.data.text
-                    if is_followup:
-                        ctx_text = f"[CONTINUING] {parent_text}"
-                    else:
-                        ctx_text = parent_text if not ctx_text else f"{ctx_text}\n\n[REPLYING TO]: {parent_text}"
-                    ctx_urls.extend(
-                        extract_urls_from_entities(getattr(parent.data, "entities", None))
-                    )
-                    ctx_images.extend(self._images_from_response(parent))
-            except tweepy.errors.TooManyRequests as e:
-                self._wait_for_rate_limit(e)
-            except Exception as e:
-                logger.warning(f"Error fetching parent tweet {replied_to_id}: {e}")
-
-        # 2. Also fetch conversation root if different from immediate parent
-        #    (provides full thread context for deep replies)
-        if (tweet.conversation_id and 
-            tweet.conversation_id != tweet.id and 
-            tweet.conversation_id != replied_to_id):
-            try:
-                root = self.tweet_cache.get(tweet.conversation_id)
-                if root and root.data:
-                    root_text = root.data.text
-                    ctx_text = f"[THREAD ROOT]: {root_text}\n\n{ctx_text}" if ctx_text else f"[THREAD ROOT]: {root_text}"
-                    ctx_urls.extend(
-                        extract_urls_from_entities(getattr(root.data, "entities", None))
-                    )
-                    ctx_images.extend(self._images_from_response(root))
-            except tweepy.errors.TooManyRequests as e:
-                self._wait_for_rate_limit(e)
-            except Exception as e:
-                logger.warning(f"Error fetching thread root {tweet.conversation_id}: {e}")
-
-        return ctx_text, ctx_images, list(dict.fromkeys(ctx_urls))
-
-    @staticmethod
-    def _images_from_response(resp) -> List[bytes]:
-        """Download photo media from a tweet response's includes."""
-        images = []
-        data = resp.data
-        if not (hasattr(data, "attachments") and data.attachments):
-            return images
-        keys = data.attachments.get("media_keys", [])
-        media_list = (resp.includes or {}).get("media", [])
-        lookup = {m.media_key: m for m in media_list}
-        for key in keys:
-            media = lookup.get(key)
-            if media and media.type == "photo" and getattr(media, "url", None):
-                try:
-                    r = requests.get(media.url, timeout=10)
-                    if r.ok:
-                        images.append(r.content)
-                except Exception:
-                    pass
-        return images
-
     # ── Processing ───────────────────────────────────────────────
 
-    def _process_tweet(self, tweet, media_lookup: dict, user_lookup: dict):
+    def _process_tweet(self, tweet, includes: dict, user_lookup: dict):
         if self.state.is_processed(tweet.id):
             return
 
@@ -275,37 +172,36 @@ class VeniceBot:
             self.state.add_tweet(tweet.id)
             return
 
-        # ── Gather context ──
-        ctx_text, ctx_images, ctx_urls = self._extract_context(tweet, media_lookup)
-
-        # ── Media from the mention itself ──
-        try:
-            img_bytes, img_url = process_tweet_media(tweet, media_lookup)
-        except Exception:
-            img_bytes, img_url = None, None
-
-        if not img_bytes and ctx_images:
-            img_bytes = ctx_images[0]
-            img_url = None
+        # ── Gather the thread, the way @grok sees it ──
+        ctx = build_context(self.tweet_cache, tweet, includes, bot_id=self.bot_id)
+        toolbox = XToolbox(self.client, self.tweet_cache, bot_id=self.bot_id)
+        logger.info(
+            f"Thread for {tweet.id}: {len(ctx.posts)} post(s), {len(ctx.linked)} linked, "
+            f"{len(ctx.images)} image(s){' (rate limited)' if ctx.rate_limited else ''}"
+        )
 
         # ── Generate reply ──
-        query = tweet.text.replace("@venice_bot", "").replace("@venice_mind", "").strip()
-
         analysis = analyse(
-            query,
-            context=ctx_text,
-            image_bytes=img_bytes,
-            image_url=img_url,
-            urls=ctx_urls,
+            question_text(ctx, self.bot_username),
+            context=ctx.render(),
+            images=ctx.images,
+            urls=ctx.urls,
+            toolbox=toolbox,
         )
         if analysis == Config.ERROR_MESSAGE:
             logger.warning(f"Analysis failed for tweet {tweet.id}")
             return
 
-        use_vision = bool(img_bytes or img_url)
-        final = craft_tweet(analysis, use_vision=use_vision, context_urls=ctx_urls)
+        allowed_links = ctx.urls + ctx.permalinks + toolbox.permalinks
+        final = craft_tweet(analysis, use_vision=bool(ctx.images), context_urls=allowed_links)
         if not final or final == Config.ERROR_MESSAGE:
             logger.warning(f"Crafting failed for tweet {tweet.id}")
+            return
+
+        if Config.DRY_RUN:
+            logger.info(f"[DRY_RUN] Would reply to {tweet.id} ({len(final)} chars, "
+                        f"{toolbox.posts_fetched} post(s) fetched by tools):\n{final}")
+            self.state.add_tweet(tweet.id)
             return
 
         # ── Post reply ──
@@ -361,7 +257,6 @@ class VeniceBot:
                 return
 
             includes = mentions.includes or {}
-            media_lookup = {m.media_key: m for m in includes.get("media", [])}
             user_lookup = {u.id: u for u in includes.get("users", [])}
 
             logger.info(f"Processing {len(mentions.data)} mention(s) …")
@@ -383,7 +278,7 @@ class VeniceBot:
                             pass
 
                 try:
-                    self._process_tweet(tweet, media_lookup, user_lookup)
+                    self._process_tweet(tweet, includes, user_lookup)
                 except Exception as e:
                     logger.error(f"Unhandled error on tweet {tweet.id}: {e}", exc_info=True)
                     self.state.add_tweet(tweet.id)

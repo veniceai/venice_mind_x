@@ -7,16 +7,20 @@ from config import Config
 
 logger = logging.getLogger(__name__)
 
+# note_tweet carries the full text of posts over 280 characters; `text` is
+# only the truncated preview for those.
 _TWEET_FIELDS = [
     "created_at", "author_id", "attachments", "public_metrics",
     "conversation_id", "referenced_tweets", "in_reply_to_user_id", "entities",
+    "note_tweet", "lang",
 ]
 _EXPANSIONS = [
     "attachments.media_keys", "author_id",
-    "in_reply_to_user_id", "referenced_tweets.id",
+    "in_reply_to_user_id", "referenced_tweets.id", "referenced_tweets.id.author_id",
 ]
-_MEDIA_FIELDS = ["type", "url", "preview_image_url"]
-_USER_FIELDS = ["protected", "verified", "username"]
+_MEDIA_FIELDS = ["type", "url", "preview_image_url", "alt_text"]
+_USER_FIELDS = ["protected", "verified", "username", "name"]
+_PROFILE_FIELDS = ["username", "name", "description", "verified", "public_metrics", "created_at"]
 
 
 def get_mentions(
@@ -35,8 +39,8 @@ def get_mentions(
     max_total = max_results or Config.MAX_MENTIONS_PER_CHECK
 
     data = []
-    media, users = [], []
-    seen_media, seen_users = set(), set()
+    media, users, tweets = [], [], []
+    seen_media, seen_users, seen_tweets = set(), set(), set()
     token = None
 
     while len(data) < max_total:
@@ -69,12 +73,19 @@ def get_mentions(
             if u.id not in seen_users:
                 seen_users.add(u.id)
                 users.append(u)
+        for t in includes.get("tweets", []):
+            if t.id not in seen_tweets:
+                seen_tweets.add(t.id)
+                tweets.append(t)
 
         token = (resp.meta or {}).get("next_token")
         if not token:
             break
 
-    return SimpleNamespace(data=data[:max_total], includes={"media": media, "users": users})
+    return SimpleNamespace(
+        data=data[:max_total],
+        includes={"media": media, "users": users, "tweets": tweets},
+    )
 
 
 def reply_to_tweet(client: tweepy.Client, tweet_id: int, text: str):
@@ -114,7 +125,36 @@ def get_tweet_by_id(client: tweepy.Client, tweet_id: int):
         tweet_fields=_TWEET_FIELDS,
         expansions=_EXPANSIONS,
         media_fields=_MEDIA_FIELDS,
-        user_fields=["username", "name"],
+        user_fields=_USER_FIELDS,
+    )
+
+
+def search_recent(client: tweepy.Client, query: str, *, latest: bool = False, max_results: int = None):
+    """Recent search (last 7 days). Needs recent-search access on the X API plan."""
+    return client.search_recent_tweets(
+        query=query,
+        max_results=max(10, min(100, max_results or Config.X_SEARCH_MAX_RESULTS)),
+        sort_order="recency" if latest else "relevancy",
+        tweet_fields=_TWEET_FIELDS,
+        expansions=_EXPANSIONS,
+        media_fields=_MEDIA_FIELDS,
+        user_fields=_USER_FIELDS,
+    )
+
+
+def get_user_by_username(client: tweepy.Client, username: str):
+    return client.get_user(username=username, user_fields=_PROFILE_FIELDS)
+
+
+def get_user_posts(client: tweepy.Client, user_id, max_results: int = None):
+    return client.get_users_tweets(
+        user_id,
+        max_results=max(5, min(100, max_results or Config.X_USER_RECENT_POSTS)),
+        exclude=["retweets"],
+        tweet_fields=_TWEET_FIELDS,
+        expansions=_EXPANSIONS,
+        media_fields=_MEDIA_FIELDS,
+        user_fields=_USER_FIELDS,
     )
 
 

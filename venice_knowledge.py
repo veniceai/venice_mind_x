@@ -107,6 +107,10 @@ def get_models(type=None):
     return data
 
 
+# Most replies run on this model, so its absence is CRITICAL rather than ERROR.
+PRIMARY_ROLE = "MODEL_UNBIASED"
+
+
 def missing_configured_models(available_ids):
     """Return {role: model_id} for configured models absent from `available_ids`.
 
@@ -145,17 +149,17 @@ def validate_configured_models():
         return {}
 
     for role, mid in missing.items():
-        level = logging.CRITICAL if role == "MODEL_PRIMARY" else logging.ERROR
+        level = logging.CRITICAL if role == PRIMARY_ROLE else logging.ERROR
         logger.log(
             level,
             "Configured %s=%r is NOT in Venice's available model list — calls "
             "using it will fail. Update config.py.",
             role, mid,
         )
-    if "MODEL_PRIMARY" in missing:
+    if PRIMARY_ROLE in missing:
         logger.critical(
-            "PRIMARY model is unavailable — every reply will degrade to a fallback. "
-            "Fix config.py immediately."
+            "PRIMARY model (the unbiased lane) is unavailable — every reply will "
+            "degrade to a fallback. Fix config.py immediately."
         )
     return missing
 

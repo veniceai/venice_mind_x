@@ -659,7 +659,7 @@ def get_injection_warning_reply(signals: List[str] = None) -> str:
 # CENSORSHIP DETECTION
 # ═════════════════════════════════════════════════════════════════
 # Detects when a model refuses/self-censors so we can retry with
-# the uncensored fallback (GLM Heretic).
+# the next model in the lane (venice_api._lane_chain).
 
 # Phrases that indicate the model is refusing to answer
 _REFUSAL_PATTERNS = [

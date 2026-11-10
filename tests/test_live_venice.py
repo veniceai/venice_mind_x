@@ -34,6 +34,21 @@ def test_analyse_and_craft_return_usable_replies(query, context, urls):
     assert len(final) <= Config.char_limit()
 
 
+@pytest.mark.parametrize(
+    "query, lane",
+    [
+        ("Is it true that the $20 fast food minimum wage destroyed 10,000 California jobs?", "unbiased"),
+        ("What is the probability two of 30 people share a birthday? Show the math.", "complex"),
+        ("What is DIEM?", "unbiased"),
+    ],
+)
+def test_jev_routes_sample_questions(query, lane):
+    import router
+    r = router.route(query)
+    assert r.reason == "", r.reason
+    assert r.lane == lane, (r.charged, r.complex)
+
+
 def test_scam_url_is_blocked_and_warned():
     query = "Is this Venice AI event legit? Should I connect my wallet?"
     urls = ["https://vvvevent.com/claim"]

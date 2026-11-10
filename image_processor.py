@@ -1,4 +1,4 @@
-"""Download the first photo from a tweet's media attachments."""
+"""Download images attached to tweets."""
 import logging
 import requests
 from typing import Optional, Tuple
@@ -9,6 +9,20 @@ _UA = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
     "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Safari/537.36"
 )
+
+
+def download_image(url: str) -> Optional[Tuple[bytes, str]]:
+    """Returns (image_bytes, mime_type), or None if the URL isn't an image."""
+    for variant in dict.fromkeys((url.split("?")[0], url)):  # bare URL is full res
+        try:
+            r = requests.get(variant, headers={"User-Agent": _UA}, timeout=10)
+            mime = r.headers.get("content-type", "").split(";")[0].strip()
+            if r.ok and mime.startswith("image/"):
+                logger.info(f"Downloaded image ({len(r.content)} bytes) from {variant}")
+                return r.content, mime
+        except Exception as e:
+            logger.debug(f"Image download failed for {variant}: {e}")
+    return None
 
 
 def process_tweet_media(
@@ -23,15 +37,8 @@ def process_tweet_media(
         media = media_lookup.get(key)
         if not (media and media.type == "photo" and getattr(media, "url", None)):
             continue
-
-        url = media.url.split("?")[0]  # strip format params for full res
-        for variant in (url, media.url):
-            try:
-                r = requests.get(variant, headers={"User-Agent": _UA}, timeout=10)
-                if r.ok and r.headers.get("content-type", "").startswith("image/"):
-                    logger.info(f"Downloaded image ({len(r.content)} bytes) from {variant}")
-                    return r.content, variant
-            except Exception as e:
-                logger.debug(f"Image download failed for {variant}: {e}")
+        got = download_image(media.url)
+        if got:
+            return got[0], media.url.split("?")[0]
 
     return None, None
