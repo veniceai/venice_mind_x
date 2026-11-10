@@ -113,6 +113,7 @@ class XToolbox:
         self.downloader = downloader
         self.permalinks: List[str] = []
         self.posts_fetched = 0
+        self.calls = 0
         self._images: List[XImage] = []
         self._images_added = 0
         self._unavailable: set = set()
@@ -140,6 +141,9 @@ class XToolbox:
             return _err(f"unknown tool: {name}")
         if name in self._unavailable:
             return _err("this tool is not available on the bot's X API plan")
+        if self.calls >= Config.X_TOOL_MAX_CALLS:
+            return _err("the X lookup budget for this reply is used up; answer with what you have")
+        self.calls += 1
         try:
             result = handler(**args)
         except TypeError:

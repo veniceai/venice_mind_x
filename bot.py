@@ -10,7 +10,8 @@ import tweepy
 from config import Config
 from state import State
 from clients import get_twitter_client
-from twitter_client import get_mentions, reply_to_tweet, TweetCache
+from reply_gate import crossed_line
+from twitter_client import fit_x_rules, get_mentions, reply_to_tweet, TweetCache
 from venice_api import analyse, craft_tweet
 from venice_knowledge import validate_configured_models
 from x_context import build_context, question_text
@@ -196,6 +197,11 @@ class VeniceBot:
         final = craft_tweet(analysis, use_vision=bool(ctx.images), context_urls=allowed_links)
         if not final or final == Config.ERROR_MESSAGE:
             logger.warning(f"Crafting failed for tweet {tweet.id}")
+            return
+        final = fit_x_rules(final, ctx.participants())
+        if crossed_line(final):
+            logger.warning(f"Not replying to {tweet.id}: the reply crosses a hard line")
+            self.state.add_tweet(tweet.id)
             return
 
         if Config.DRY_RUN:

@@ -92,6 +92,16 @@ def test_view_image_only_from_x_media_hosts():
     assert box.take_images() == []
 
 
+def test_tool_calls_per_reply_are_capped(monkeypatch):
+    monkeypatch.setattr(Config, "X_TOOL_MAX_CALLS", 2)
+    client = FakeClient(search=resp([tweet(7, "post", 1)], users=[ALICE]))
+    box = _box(client=client)
+    _run(box, "x_keyword_search", query="a")
+    _run(box, "x_keyword_search", query="b")
+    assert "budget" in _run(box, "x_keyword_search", query="c")["error"]
+    assert len(client.calls) == 2
+
+
 def test_errors_come_back_as_json_not_exceptions():
     box = _box(FakeCache({1: too_many_requests()}))
     assert "rate limit" in _run(box, "x_thread_fetch", post_id="1")["error"]

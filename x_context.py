@@ -212,6 +212,14 @@ class ThreadContext:
     def permalinks(self) -> List[str]:
         return list(dict.fromkeys(p.permalink for p in self.all_posts()))
 
+    def participants(self) -> List[str]:
+        """Handles a reply may @mention: thread authors other than the asker and the bot."""
+        asker = (self.mention.username or "").lower()
+        return list(dict.fromkeys(
+            p.username for p in self.posts
+            if p.username and not p.mine and p.username.lower() != asker
+        ))
+
     def render(self) -> str:
         lines = ["X THREAD (oldest first):"]
         for i, p in enumerate(self.posts, 1):

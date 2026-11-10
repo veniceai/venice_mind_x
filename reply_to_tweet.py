@@ -13,8 +13,9 @@ from typing import Optional
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from clients import get_twitter_client
+from reply_gate import crossed_line
 from router import route
-from twitter_client import get_tweet_by_id, reply_to_tweet, TweetCache
+from twitter_client import fit_x_rules, get_tweet_by_id, reply_to_tweet, TweetCache
 from venice_api import analyse, craft_tweet
 from safety import classify_url
 from x_context import build_context, question_text
@@ -60,7 +61,7 @@ def main():
         print(f"   {classify_url(u):>10} │ {u}")
 
     r = route(query, ctx.render(), bool(ctx.images))
-    print(f"🧭 Lane: {r.lane} (charged={r.charged}, complex={r.complex}) {r.reason}")
+    print(f"🧭 Lane: {r.lane} (charged={r.charged}, filtered={r.filtered}, complex={r.complex}) {r.reason}")
 
     toolbox = XToolbox(client, cache, bot_id=me.id)
     print("🤖 Analysing …")
@@ -70,13 +71,17 @@ def main():
         analysis, use_vision=bool(ctx.images),
         context_urls=ctx.urls + ctx.permalinks + toolbox.permalinks,
     )
+    final = fit_x_rules(final, ctx.participants())
+    line = crossed_line(final)
+    if line:
+        print(f"⛔ The reply crosses a hard line ({line}); the bot would not post it.")
 
     print(f"\n{'=' * 60}")
     print(f"🎯 RESPONSE ({len(final)} chars, {toolbox.posts_fetched} post(s) fetched by tools):")
     print("=" * 60)
     print(final)
     print("=" * 60)
-    if dry:
+    if dry or line:
         return
 
     while True:

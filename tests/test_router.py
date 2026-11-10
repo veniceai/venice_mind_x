@@ -1,4 +1,4 @@
-"""Plan 0002 — Jev lane routing (offline; Venice is stubbed)."""
+"""Plan 0002 — decision-model lane routing (offline; Venice is stubbed)."""
 from types import SimpleNamespace
 
 import pytest
@@ -10,19 +10,21 @@ from router import COMPLEX, UNBIASED, choose_lane
 
 
 @pytest.mark.parametrize(
-    "charged, complex_, lane",
+    "charged, filtered, complex_, lane",
     [
-        (0.93, 0.78, UNBIASED),   # charged and complex: unbiased wins
-        (0.02, 0.85, COMPLEX),    # math
-        (0.03, 0.54, UNBIASED),   # under the complex threshold
-        (0.10, 0.13, UNBIASED),   # simple fact
-        (0.50, 0.99, UNBIASED),   # exactly at the charged threshold
-        (0.49, 0.60, COMPLEX),    # exactly at the complex threshold
-        (None, 0.90, UNBIASED),   # missing answer
+        (0.95, 0.14, 0.65, UNBIASED),   # contested claim
+        (0.01, 0.02, 0.94, COMPLEX),    # math
+        (0.17, 0.98, 0.92, UNBIASED),   # complex but filtered (drug dosing) stays uncensored
+        (0.02, 0.78, 0.81, UNBIASED),   # lock picking
+        (0.04, 0.03, 0.70, UNBIASED),   # under the complex threshold
+        (0.50, 0.00, 0.99, UNBIASED),   # exactly at the charged threshold
+        (0.00, 0.50, 0.99, UNBIASED),   # exactly at the filtered threshold
+        (0.49, 0.49, 0.85, COMPLEX),    # exactly at the complex threshold
+        (None, 0.0, 0.90, UNBIASED),    # missing answer
     ],
 )
-def test_choose_lane(charged, complex_, lane):
-    assert choose_lane(charged, complex_) == lane
+def test_choose_lane(charged, filtered, complex_, lane):
+    assert choose_lane(charged, filtered, complex_) == lane
 
 
 def _fake_post(answers=None, *, status=200, exc=None, calls=None):
@@ -40,22 +42,25 @@ def _fake_post(answers=None, *, status=200, exc=None, calls=None):
     return post
 
 
-def _answers(charged, complex_):
+def _answers(charged, filtered, complex_, private_info=0.01):
     return {
         "charged": {"type": "noul", "noul": charged},
+        "filtered": {"type": "noul", "noul": filtered},
         "complex": {"type": "noul", "noul": complex_},
+        "private_info": {"type": "noul", "noul": private_info},
     }
 
 
-def test_route_sends_both_questions_to_jev(monkeypatch):
+def test_route_sends_four_questions_to_clef(monkeypatch):
     calls = []
-    monkeypatch.setattr(router.requests, "post", _fake_post(_answers(0.05, 0.9), calls=calls))
+    monkeypatch.setattr(router.requests, "post", _fake_post(_answers(0.05, 0.02, 0.9), calls=calls))
     r = router.route("integral of x^2 e^x", "X THREAD …", has_image=True)
-    assert r.lane == COMPLEX and r.complex == 0.9
+    assert r.lane == COMPLEX and r.complex == 0.9 and r.filtered == 0.02
     sent = calls[0]
     assert sent["url"] == Config.VENICE_DECISIONS_URL
-    assert sent["json"]["model"] == "jev-latest"
-    assert set(sent["json"]["questions"]) == {"charged", "complex"}
+    assert sent["json"]["model"] == "clef-api"
+    assert set(sent["json"]["questions"]) == {"charged", "filtered", "complex", "private_info"}
+    assert not r.decline
     assert all(q["type"] == "noul" for q in sent["json"]["questions"].values())
     assert sent["json"]["state"] == {"question": "integral of x^2 e^x", "thread": "X THREAD …", "has_image": True}
     assert sent["timeout"] == Config.ROUTER_TIMEOUT_SECONDS
@@ -64,12 +69,12 @@ def test_route_sends_both_questions_to_jev(monkeypatch):
 @pytest.mark.parametrize(
     "post",
     [
-        _fake_post(status=403),                                  # key limited to private models
+        _fake_post(status=403),
         _fake_post(exc=requests.exceptions.Timeout("slow")),
-        _fake_post({"charged": {"type": "noul"}}),               # malformed answer
+        _fake_post({"charged": {"type": "noul", "noul": 0.1}}),   # malformed answer
     ],
 )
-def test_route_falls_back_to_unbiased_on_any_failure(monkeypatch, post):
+def test_route_falls_back_to_uncensored_lane_on_any_failure(monkeypatch, post):
     monkeypatch.setattr(router.requests, "post", post)
     r = router.route("anything")
     assert r.lane == UNBIASED
@@ -78,7 +83,7 @@ def test_route_falls_back_to_unbiased_on_any_failure(monkeypatch, post):
 
 def test_route_disabled_skips_the_call(monkeypatch):
     calls = []
-    monkeypatch.setattr(router.requests, "post", _fake_post(_answers(0, 1), calls=calls))
+    monkeypatch.setattr(router.requests, "post", _fake_post(_answers(0, 0, 1), calls=calls))
     monkeypatch.setattr(Config, "ROUTER_ENABLED", False)
     assert router.route("anything").lane == UNBIASED
     assert calls == []
@@ -89,3 +94,8 @@ def test_state_keeps_the_end_of_a_long_thread():
     state = router.build_state("q", thread, False)
     assert len(state["thread"]) == Config.ROUTER_STATE_MAX_CHARS
     assert state["thread"].endswith("THE MENTION")
+
+
+def test_dox_requests_are_flagged_for_a_decline(monkeypatch):
+    monkeypatch.setattr(router.requests, "post", _fake_post(_answers(0.1, 0.3, 0.1, private_info=0.98)))
+    assert router.route("find this guy's home address").decline

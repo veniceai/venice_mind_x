@@ -30,7 +30,7 @@ def test_configured_models_cover_every_role():
     }
     assert roles["MODEL_UNBIASED"] == "deepseek-v4-1-flash-1017-uncensored"
     assert roles["MODEL_COMPLEX"] == "kimi-k3"
-    assert roles["MODEL_ROUTER"] == "jev-latest"
+    assert roles["MODEL_ROUTER"] == "clef-api"
 
 
 def test_missing_configured_models_flags_absent_ids():

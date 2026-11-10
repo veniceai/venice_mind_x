@@ -88,6 +88,12 @@ def test_stops_when_page_empty():
     assert len(client.calls) == 1
 
 
+def test_uses_user_context_for_owned_read_pricing():
+    client = FakeClient([{"data": [_Tweet(1)], "next_token": None}])
+    get_mentions(client, 999, max_results=50)
+    assert client.calls[0]["user_auth"] is True
+
+
 def test_passes_start_time_through():
     client = FakeClient([{"data": [_Tweet(1)], "next_token": None}])
     get_mentions(client, 999, start_time="2026-01-01T00:00:00.000Z", max_results=50)

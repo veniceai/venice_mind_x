@@ -1,5 +1,6 @@
 """Twitter API wrappers — mentions, replies, tweet lookup."""
 import logging
+import re
 from types import SimpleNamespace
 
 import tweepy
@@ -52,6 +53,9 @@ def get_mentions(
             "expansions": _EXPANSIONS,
             "media_fields": _MEDIA_FIELDS,
             "user_fields": _USER_FIELDS,
+            # User context, not the app bearer token: X bills an account's own
+            # mentions as Owned Reads ($0.001 vs $0.005 per post) only then.
+            "user_auth": True,
         }
         if start_time:
             kwargs["start_time"] = start_time
@@ -86,6 +90,29 @@ def get_mentions(
         data=data[:max_total],
         includes={"media": media, "users": users, "tweets": tweets},
     )
+
+
+# twitter-text's cashtag shape: $ + 1-6 letters, optional ._ suffix.
+_CASHTAG_RE = re.compile(r"(?<![\w$])\$([A-Za-z]{1,6}(?:[._][A-Za-z]{1,2})?)(?![\w])")
+_HANDLE_RE = re.compile(r"(?<![\w@])@(\w{1,15})\b")
+
+
+def fit_x_rules(text: str, participants=()) -> str:
+    """Make a reply acceptable to X's self-serve posting rules.
+
+    X rejects API posts with more than one cashtag, and only lets API posts
+    @mention accounts already in the conversation. Extra cashtags lose their $;
+    @handles outside `participants` lose their @.
+    """
+    seen = {"n": 0}
+
+    def cashtag(m):
+        seen["n"] += 1
+        return m.group(0) if seen["n"] == 1 else m.group(1)
+
+    allowed = {p.lower() for p in participants if p}
+    text = _CASHTAG_RE.sub(cashtag, text)
+    return _HANDLE_RE.sub(lambda m: m.group(0) if m.group(1).lower() in allowed else m.group(1), text)
 
 
 def reply_to_tweet(client: tweepy.Client, tweet_id: int, text: str):

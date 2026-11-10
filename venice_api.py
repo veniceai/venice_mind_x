@@ -66,6 +66,20 @@ def _strip_refs(text: str) -> str:
     return _REF_RE.sub("", text).strip()
 
 
+# DeepSeek sometimes writes a tool call as text (DSML markup) instead of a
+# structured tool_calls entry, and reasoning can leak into content ahead of a
+# closing </think>. Neither is a reply.
+_TOOL_MARKUP_RE = re.compile(
+    r"<\s*[｜|]\s*DSML\s*[｜|]|<\s*/?\s*(?:tool_call|function_calls?|invoke)\b", re.IGNORECASE
+)
+
+
+def _clean_content(text: str) -> str:
+    if "</think>" in text:
+        text = text.rsplit("</think>", 1)[1]
+    return _strip_refs(text.strip())
+
+
 def _needs_fresh_data(query: str) -> bool:
     """Check if the query likely needs live web data."""
     q_lower = query.lower()
@@ -210,7 +224,8 @@ def _call_venice(
     )
     rounds = Config.X_TOOL_MAX_ROUNDS if use_tools else 0
 
-    for turn in range(rounds + 1):
+    turn = retried = 0
+    while turn <= rounds:
         last = turn == rounds
         msg = _chat(
             model, messages, urls=urls, temperature=temperature,
@@ -222,7 +237,15 @@ def _call_venice(
             return None
         calls = msg.get("tool_calls") or []
         if not calls or last:
-            return _strip_refs((msg.get("content") or "").strip()) or None
+            text = _clean_content(msg.get("content") or "")
+            if _TOOL_MARKUP_RE.search(text):
+                logger.warning(f"{model} wrote a tool call as text instead of calling it")
+                if retried:
+                    return None
+                retried = 1
+                continue
+            return text or None
+        turn += 1
 
         assistant = {"role": "assistant", "content": msg.get("content") or "", "tool_calls": calls}
         if msg.get("reasoning_content"):
@@ -367,7 +390,11 @@ def analyse(
         logger.info("🔍 Query needs fresh data — forcing web search")
 
     # ── MODEL CASCADE ──
-    lane = route(query, context, has_image).lane
+    r = route(query, context, has_image)
+    if r.decline:
+        logger.warning(f"🔒 Declining a request for someone's private details: {query[:80]}")
+        return f"[FINAL_REPLY]{Config.DECLINE_PRIVATE_INFO}[/FINAL_REPLY]"
+    lane = r.lane
     result = censored = None
     for model, effort in _lane_chain(lane):
         out = _call_venice(
