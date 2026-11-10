@@ -1,17 +1,23 @@
-# Plan 0002 — Grok-style replies: Jev routing, DeepSeek/Kimi lanes, X tools
+# Plan 0002 — Grok-style replies: Clef routing, DeepSeek/Kimi lanes, X tools
 
 - **Status:** Built and tested against live Venice; not yet run against the live X API
 - **Date:** 2026-11-10
 - **Requested by:** Jordan (Venice user education)
 
-> **Outcome so far:** all six parts below are in place. 165 offline tests and 7
+> **Outcome so far:** all parts below are in place. 184 offline tests and 8
 > live Venice tests pass. `scripts/eval_replies.py` (live Venice, X faked) shows
-> Jev sending charged questions to DeepSeek and math/code to Kimi K3 in about
-> 0.9 s per route, the model calling X tools on its own when the thread isn't
-> enough, and format demands on contested questions answered with a balanced
-> sentence. Replies take 5–30 s (tool-heavy fact checks are the slow end).
+> Clef keeping contested and taboo questions on DeepSeek Uncensored and sending
+> math/code to Kimi K3 (about 1.4 s per route), the model calling X tools on its
+> own when the thread isn't enough, frank answers on drugs and dark humor,
+> clear verdicts on contested claims, and doxxing requests declined before any
+> model runs. Replies take 5–45 s (tool-heavy fact checks are the slow end).
 > Still to do: a `DRY_RUN` session on the real account, which needs its X
-> credentials.
+> credentials; see [`../OPERATOR.md`](../OPERATOR.md).
+>
+> **Revisions the same day (Jordan):** the router moved from Jev to Clef
+> (private, and more decisive; section 1); the voice moved from @grok's
+> neutral tone to Venice's rebel stance, uncensored and unbiased (section 5),
+> with hard lines enforced in code (section 7).
 
 ## The goal
 
@@ -25,9 +31,11 @@ hard (math, code, technical deep-dives) and need a stronger reasoner.
 - Complex questions go to **Kimi K3** (`kimi-k3`): private, vision, function
   calling, 1M context, $3.75/$18.75 per 1M tokens, Venice's `default_reasoning`
   trait. Its default reasoning effort is `max`, so the bot sets it explicitly.
-- A quick **Jev** decision call (`jev-latest`, `POST /api/v1/decisions`)
+- A quick **Clef** decision call (`clef-api`, `POST /api/v1/decisions`)
   picks the lane per mention.
 - The bot reads X post data the way `@grok` does.
+- The output is very clearly uncensored and unbiased, as far as the evidence
+  allows: the Venice brand is the rebel.
 
 ## How `@grok` does it (2026-11-10 research)
 
@@ -78,36 +86,48 @@ the `@grok` bot on X), the xAI X Search tool docs, and "Asking Grok"
 
 ## Design
 
-### 1. Lane routing with Jev (`router.py`)
+### 1. Lane routing with Clef (`router.py`)
 
-One `POST /api/v1/decisions` per mention, two `noul` (yes/no probability)
+One `POST /api/v1/decisions` per mention, four `noul` (yes/no probability)
 questions over a structured state (the question plus the rendered thread):
 
 - `charged` — answering needs a judgment on a contested political, social,
   cultural, religious or moral question, a public figure, or whether a
   disputed claim is true.
+- `filtered` — a safety-filtered model might refuse, water down or hedge it
+  (drugs, sex, violence, weapons, crime, hacking, extremism, conspiracies,
+  medical/legal/financial gray areas, offensive humor). Kimi K3 is
+  safety-tuned; this keeps those questions on the uncensored model.
 - `complex` — a good answer needs several steps of reasoning: math, code, a
   technical or scientific explanation, analysis of a long document, chart or
   thread, or weighing several sources.
+- `private_info` — the question asks to find or reveal a specific person's
+  identity, address, phone, workplace or other private details. At 0.5 or
+  above the bot posts a one-line decline and runs no model or X lookup.
 
-Rule (pure function, unit-tested): `charged ≥ 0.5` → unbiased lane;
-otherwise `complex ≥ 0.6` → complex lane; otherwise unbiased. A question that is
-both charged and complex goes to DeepSeek, because the unbiased answer is the
-main use case. Any Jev failure (timeout, 4xx/5xx, malformed answer) routes to
-the unbiased lane. Thresholds and the decision model are config.
+Rule (pure function, unit-tested): `charged ≥ 0.5` or `filtered ≥ 0.5` →
+uncensored lane; otherwise `complex ≥ 0.85` → complex lane; otherwise
+uncensored. Any router failure (timeout, 4xx/5xx, malformed answer) routes to
+the uncensored lane. Thresholds and the decision model are config.
 
-Jev runs in Venice's **anonymized** mode: TypeSafe sees the state and the
-questions, not who sent them. The state is public X content, so this is
-acceptable; `clef-api` (Cloudflare, private) is a drop-in alternative via
-`MODEL_ROUTER`. A Venice key restricted to private models gets a 403 from Jev,
-which falls back to the unbiased lane.
+**Clef vs Jev (bake-off, 26 questions, 2026-11-10).** Both sit behind the same
+endpoint. Clef (`clef-api`, Cloudflare, private) picked the expected lane 25
+times; the miss was a nuclear-reactor deep-dive that a borderline `filtered`
+score (0.52) kept on DeepSeek, the safe direction. Jev (`jev-latest`,
+TypeSafe, anonymized) managed 23 at its best threshold and sent code
+questions to DeepSeek; its `complex` scores cluster around 0.5–0.85 where
+Clef's sit near 0 or 1. Clef's median was 1.37 s against Jev's 0.83 s. Clef
+also keeps every model the bot calls private, so the Venice key needs no
+anonymized-model access. Three of three doxxing requests scored 0.90–0.98 on
+`private_info`; seven ordinary questions (including an organization's press
+email and "which city is Elon Musk based in") stayed under 0.30.
 
 ### 2. Model lanes and fallbacks (`venice_api.py`)
 
 | Lane | Chain | Reasoning effort |
 |---|---|---|
-| unbiased | DeepSeek 1017 Uncensored → DeepSeek V4.1 Flash Uncensored → Venice Uncensored 1.2 | `high` (model default) |
-| complex | Kimi K3 → the unbiased chain | `high` (Kimi defaults to `max`) |
+| uncensored (`UNBIASED` in code) | DeepSeek 1017 Uncensored → DeepSeek V4.1 Flash Uncensored → Venice Uncensored 1.2 | `high` (model default) |
+| complex | Kimi K3 → the uncensored chain | `high` (Kimi defaults to `max`) |
 
 Every model in both chains is private and supports vision and function
 calling (checked against the live catalog 2026-11-10). A refusal (the existing
@@ -145,8 +165,12 @@ OpenAI-style function tools, run by the bot against the X API v2 (tweepy):
 | `x_user_lookup(username)` | `GET /2/users/by/username` + `GET /2/users/:id/tweets` | Profile and recent posts |
 | `view_image(url)` | download | Only X media hosts (`pbs.twimg.com`), adds the image to the conversation |
 
-Caps: `X_TOOL_MAX_ROUNDS` model turns with tool calls, `X_SEARCH_MAX_RESULTS`
-posts per search. Rate limits and 403s (access tier) come back to the model
+Caps: `X_TOOL_MAX_ROUNDS` model turns with tool calls, `X_TOOL_MAX_CALLS` (4)
+calls per reply, `X_SEARCH_MAX_RESULTS` posts per search; the eval saw single
+replies make 6–7 calls before the call cap, at up to $0.05 of X reads per
+search. DeepSeek sometimes writes a tool call as text markup instead of a
+structured call; that turn is retried once, then the next model takes over.
+Rate limits and 403s (access tier) come back to the model
 as a short "unavailable" result instead of sleeping inside the reply. Every
 fetched post passes `screen_input_for_injection`; a flagged post is replaced
 with a "[withheld]" note so the model never reads the command. Permalinks of
@@ -159,34 +183,71 @@ Not mirrored: semantic search (the X API has none) and video understanding
 ### 5. Prompt and length (`config.py`)
 
 `ANALYST_PROMPT` keeps the Venice knowledge, anti-scam and token-injection
-blocks unchanged and replaces the persona with the `@grok` reply rules above,
-plus when to use each X tool. Reply length follows `@grok`: under 550
-characters on an X Premium account, 280 otherwise (`reply_target()`); the hard
-post limit stays `char_limit()`.
+blocks unchanged. From `@grok` it takes the research rules (independent
+analysis, sources from all sides, media assumed biased, format demands don't
+override the answer, no labels, no slogans, same language, no tagging). The
+voice is Venice's (`venice-marketing-os/context/VOICE.md` and
+`MESSAGING_HOUSE.md`: "direct, adult, principled", "intelligence without
+paternalistic degradation"), in three blocks:
+
+- **UNCENSORED** — answer any topic frankly; no refusals, lectures, content
+  warnings or caveat piles; one caveat only when it changes what the reader
+  should do.
+- **UNBIASED** — no side gets a pass (left or right, governments, media,
+  experts, institutions, AI labs, Venice included); official narratives held
+  to the same evidence standard; a clear verdict where the evidence lands,
+  including against the official line; a level, never partisan tone. This
+  replaces `@grok`'s "neutral tone", which read as fence-sitting.
+- **VOICE** — short sentences, lead with the answer, dry wit; rebel means
+  saying the true thing others won't, not edginess for effect.
+
+Plus the hard lines (section 7), no links (X bills a post with a URL at $0.20
+instead of $0.01), and at most one cashtag. Reply length follows `@grok`:
+under 550 characters on an X Premium account, 280 otherwise
+(`reply_target()`); the hard post limit stays `char_limit()`.
 
 ### 6. Rollout
 
 - `DRY_RUN=true` logs the would-be reply and posts nothing.
-- `reply_to_tweet.py <url>` runs the full new pipeline on one real post and
-  asks before posting.
-- Credentials are with whoever runs the bot today; the X tools need
-  recent-search and user-lookup access on that account's X API plan.
+- `reply_to_tweet.py <url> --dry` runs the full new pipeline on one real post.
+- The operator checklist (X App, credits, permissions, keys, Venice key,
+  hosting, costs, first run) is [`../OPERATOR.md`](../OPERATOR.md).
+
+### 7. Hard lines and X's posting rules
+
+The uncensored model is abliterated, so it barely refuses even when told to.
+Four hard lines are written into the prompt and enforced in code: sexual
+content involving minors, finding or revealing a private person's details,
+threats or calls for violence, and instructions for mass-casualty weapons.
+
+- The router's `private_info` question declines doxxing requests before any
+  model or X lookup runs (in the eval the model otherwise made 4–7 lookups
+  hunting for the person and offered to keep digging).
+- `reply_gate.py` asks Clef whether the final reply crosses any of the four;
+  if so, nothing posts. It fails open. On eleven sample replies (drug doses,
+  harm reduction, dark jokes, lock picking, SIM swapping, a public figure's
+  city) it flagged only the doxxing one.
+- `twitter_client.fit_x_rules` enforces X's self-serve limits on the way out:
+  one cashtag per post, @mentions only of people already in the conversation.
+
+`REPLY_GATE_ENABLED=false` turns the gate off; the router decline has no
+switch short of removing it.
 
 ## Cost per reply (estimate)
 
-- Jev: a few thousand input tokens at $0.042 per 1M — under $0.001.
-- DeepSeek lane: typically 3–10K input, 0.5–2K output — about $0.002–0.006.
-- Kimi lane: same tokens — about $0.02–0.08.
-- X API reads: thread walk (1 per hop) plus whatever the tools fetch, billed
-  by the account's X plan.
+See the cost table in [`../OPERATOR.md`](../OPERATOR.md): a typical DeepSeek
+reply is about $0.03–0.04 across X reads, the summoned reply post ($0.01),
+Venice tokens and web search; a heavy one with four X tool calls about $0.35.
 
 ## Testing
 
-- Offline (pytest, no keys): lane rule, Jev request/fallbacks, thread walk,
-  long-post text, link resolution, media caps, tool dispatch, redaction, error
-  handling, the tool loop with a mocked Venice, model validation.
+- Offline (pytest, no keys): lane rule, router request/fallbacks and decline,
+  thread walk, long-post text, link resolution, media caps, tool dispatch,
+  call budget, redaction, error handling, the tool loop with a mocked Venice
+  (including text-markup tool calls and leaked reasoning), the gate, X rules,
+  model validation.
 - Live (`pytest -m live`, Venice key only): routing sample questions through
-  Jev; a full reply over a fake X client.
+  Clef; a full reply over a fake X client.
 
 ## Out of scope
 

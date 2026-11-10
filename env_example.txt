@@ -5,7 +5,7 @@ TWITTER_API_SECRET=your_twitter_api_secret_here
 TWITTER_ACCESS_TOKEN=your_twitter_access_token_here
 TWITTER_ACCESS_TOKEN_SECRET=your_twitter_access_token_secret_here
 
-# Venice API Key (needs access to anonymized models: the Jev router is anonymized)
+# Venice API Key (an INFERENCE key; every model the bot calls is private)
 VENICE_API_KEY=your_venice_api_key_here
 
 # X Premium Configuration (set to "true" if your bot account has X Premium/Blue)
@@ -14,5 +14,8 @@ X_PREMIUM_ENABLED=false
 # Log the reply that would be posted instead of posting it
 DRY_RUN=false
 
-# Route each mention with Jev (false: every mention goes to the unbiased DeepSeek lane)
+# Route each mention with Clef (false: every mention goes to the uncensored DeepSeek lane)
 ROUTER_ENABLED=true
+
+# Check the final reply against the hard lines before posting (false: skip the check)
+REPLY_GATE_ENABLED=true

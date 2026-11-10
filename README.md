@@ -1,14 +1,21 @@
 # Venice X Bot (@venice_mind)
 
 An X reply bot powered by Venice AI. People tag it in a post or thread to get
-more information; it answers the way `@grok` does, with every Venice model in
-private mode.
+more information. It reads X the way `@grok` does and answers in Venice's
+voice: uncensored and unbiased, with every model in private mode.
+
+Running it: [`docs/OPERATOR.md`](docs/OPERATOR.md) lists everything the
+operator needs (X App and credits, keys, Venice key, hosting, costs, first run).
 
 ## Features
 
-- **Two model lanes, routed per mention by Jev** (Venice's decision model):
-  DeepSeek V4.1 Flash 1017 Uncensored for questions that need an unbiased
-  answer (most of them), Kimi K3 for math, code and technical deep-dives
+- **Two model lanes, routed per mention by Clef** (Venice's private decision
+  model): DeepSeek V4.1 Flash 1017 Uncensored for anything contested or taboo
+  (most questions), Kimi K3 only for math, code and technical deep-dives that
+  aren't
+- **Uncensored, unbiased voice** — frank answers on any topic, a clear verdict
+  where the evidence lands, no side gets a pass; a short list of hard lines
+  (minors, doxxing, threats, mass-casualty weapons) checked on every reply
 - **Reads the whole thread** — every post in the reply chain with its author,
   long posts in full, quoted and linked posts, photos and video thumbnails
 - **X tools** the model calls when the thread isn't enough: thread fetch,
@@ -71,7 +78,8 @@ twitter_bot_venice/
 ├── main.py              # Entry point
 ├── bot.py               # Mention polling + processing
 ├── config.py            # Models, prompts, settings
-├── router.py            # Jev lane routing
+├── router.py            # Clef lane routing
+├── reply_gate.py        # Hard-line check on the final reply
 ├── venice_api.py        # Venice API calls, tool loop, model cascade
 ├── x_context.py         # The thread a mention gets (chain, quotes, links, media)
 ├── x_tools.py           # X tools the model can call
@@ -92,12 +100,16 @@ tokens, from the Venice catalog on 2026-11-10.
 | `kimi-k3` | Complex lane (reasoning effort `high`) | $3.75 / $18.75 |
 | `deepseek-v4-1-flash-uncensored` | Fallback | $0.33 / $1.32 |
 | `venice-uncensored-1-2` | Last resort | $0.20 / $0.90 |
-| `jev-latest` | Router (anonymized decision model) | $0.042 input, output free |
+| `clef-api` | Router and hard-line gate (private decision model) | $0.05 / $0.05 |
 
-Jev asks two yes/no questions per mention: is it charged (contested, political,
-a disputed claim) and is it complex (multi-step reasoning). Charged questions
-always go to DeepSeek; complex ones that aren't charged go to Kimi K3; anything
-else, and any router failure, goes to DeepSeek. Design and research:
+Clef asks four yes/no questions per mention: is it charged (contested,
+political, a disputed claim), is it a topic a filtered model would dodge (drugs,
+sex, crime, hacking, conspiracies…), is it complex (multi-step reasoning), and
+does it ask to dig up someone's private details. Charged or filtered questions
+always go to DeepSeek Uncensored; complex ones that are neither go to Kimi K3;
+anything else, and any router failure, goes to DeepSeek. Doxxing requests get a
+one-line decline. On a 26-question sample Clef picked the expected lane 25
+times (Jev, the anonymized alternative, 23). Design and research:
 [`docs/plans/0002-grok-style-replies.md`](docs/plans/0002-grok-style-replies.md).
 
 ## X API access
@@ -117,7 +129,9 @@ Key settings in `config.py`:
 | `MAX_TWEET_AGE_MINUTES` | 60 | Ignore older tweets |
 | `MAX_REPLIES_PER_HOUR` | 15 | Rate limit |
 | `X_PREMIUM_ENABLED` | false | Replies aim for 550 chars (like `@grok`) if true, 280 if false |
-| `ROUTER_COMPLEX_THRESHOLD` | 0.6 | Jev's "complex" probability that sends a question to Kimi K3 |
+| `ROUTER_COMPLEX_THRESHOLD` | 0.85 | Clef's "complex" probability that sends a question to Kimi K3 |
+| `ROUTER_FILTERED_THRESHOLD` | 0.5 | Clef's "a filtered model would dodge this" probability that keeps it on DeepSeek |
+| `X_TOOL_MAX_CALLS` | 4 | X tool calls per reply (each search reads up to 10 posts at $0.005) |
 | `THREAD_MAX_DEPTH` | 6 | Reply-chain posts walked up from a mention |
 | `X_TOOL_MAX_ROUNDS` | 3 | Model turns per reply that may call X tools |
 
@@ -151,8 +165,9 @@ TWITTER_API_KEY=
 TWITTER_API_SECRET=
 TWITTER_ACCESS_TOKEN=
 TWITTER_ACCESS_TOKEN_SECRET=
-VENICE_API_KEY=          # needs access to anonymized models for Jev
+VENICE_API_KEY=          # INFERENCE key; every model the bot calls is private
 X_PREMIUM_ENABLED=false
 DRY_RUN=false            # true: log replies, post nothing
 ROUTER_ENABLED=true      # false: every mention goes to DeepSeek
+REPLY_GATE_ENABLED=true  # false: skip the hard-line check on the final reply
 ```
