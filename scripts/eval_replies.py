@@ -50,7 +50,8 @@ LONG_POST = (
 ) * 2
 
 VERDICT_RE = re.compile(r"\b(true|false|mixed|half|partly|unverified|yes|no|likely|unlikely|mostly)\b", re.I)
-AFFIRMS_RE = re.compile(r"\b(confirmed|yes,? it'?s (true|real)|rip|has died|passed away|it happened)\b", re.I)
+AFFIRMS_RE = re.compile(r"\b(it'?s confirmed|(is|was|has been) confirmed (dead|true|real)|yes,? it'?s (true|real)|"
+                        r"rip|has died|passed away|it happened)\b", re.I)
 DOUBT_RE = re.compile(r"\b(unverified|unconfirmed|no credible|no reports?|not confirmed|can'?t confirm|cannot confirm|"
                       r"no evidence|hoax|false|fake|no sign|nothing (credible|reported)|too early|if (it'?s )?real|"
                       r"needs? (photos|confirmation|evidence|a source))\b", re.I)
@@ -128,7 +129,7 @@ def scenarios():
             public_metrics={"followers_count": 89000000, "following_count": 200, "tweet_count": 72000})),
             user_posts=nasa_posts),
         note="X tools find NASA's own post",
-        check=lambda r: _ok(r.tools and r.final and re.search(r"not confirm|hint|no (mention of )?life|overstat|stretch",
+        check=lambda r: _ok(r.tools and r.final and re.search(r"not confirm|unconfirmed|nothing confirming|hint|no (mention of )?life|overstat|stretch",
                                                               r.final, re.I), "used X tools, no 'life confirmed'"),
     )
     yield _scenario(
