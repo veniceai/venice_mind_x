@@ -69,7 +69,7 @@ is told those tools are unavailable.
   | `kimi-k3` | Complex lane |
   | `deepseek-v4-1-flash-uncensored` | Fallback |
   | `venice-uncensored-1-2` | Last resort |
-  | `clef-api` | Router and hard-line gate, via `POST /api/v1/decisions` (Beta) |
+  | `clef-api` | Router and final-reply gate, via `POST /api/v1/decisions` (Beta) |
 
   At startup the bot logs CRITICAL if the main model is missing and ERROR for
   the others.
@@ -132,4 +132,6 @@ near $10–15, with a worst-case ceiling around $125. Set both spending limits.
 | `Router (clef-api) failed` | Every mention falls back to DeepSeek until it recovers |
 | `not available on the X API plan` | The X plan rejects search or user lookup |
 | `403 on reply` | Read-only tokens, or a reply X's summon rule rejected |
-| `Reply crosses a hard line` / `Declining a request for someone's private details` | The gate or the router stopped a reply |
+| `Not posting: the reply fails the … check` / `Declining a request for someone's private details` | The gate or the router stopped a reply |
+| `Reply gate failed` / `Router (clef-api) failed` (ERROR) | Clef is down: replies post unchecked and doxxing requests aren't declined until it recovers |
+| `REPLY_GATE_ENABLED is off` / `ROUTER_ENABLED is off` (ERROR at startup) | A safety switch is off |

@@ -14,7 +14,7 @@ the codebase behind **@venice_mind**, a Twitter/X bot powered by Venice AI.
 
 A long-running Python process that polls its own Twitter mentions, runs each
 mention through a Venice AI pipeline (Clef routing → analysis with X tools →
-tweet crafting → X rules + hard-line gate), and posts a reply. It reads the whole reply chain with authors,
+tweet crafting → `finalize.py`: X rules, token backstop, Clef gate), and posts a reply. It reads the whole reply chain with authors,
 long posts, quotes, linked posts and media, calls X tools when it needs more,
 answers questions about Venice's products from a committed FAQ snapshot + live
 models API, and blocks crypto scams and prompt-injection attempts. It reads X
@@ -34,7 +34,8 @@ JSON file. It is deployed as a plain `python main.py` process.
 | `bot.py` | Core loop: poll mentions → filter → gather thread context → generate → reply. Rate limiting, anti-spam, backoff, `DRY_RUN`. |
 | `config.py` | **Single source of truth** for settings, model IDs, and the two system prompts (`ANALYST_PROMPT`, `CRAFTER_PROMPT`). |
 | `router.py` | One Clef call (`POST /decisions`, four yes/no questions) per mention → uncensored lane (DeepSeek) or complex lane (Kimi K3), or a decline for doxxing requests. `choose_lane` is pure. |
-| `reply_gate.py` | Clef check of the final reply against the prompt's HARD LINES; fails open. |
+| `reply_gate.py` | Clef check of the final reply, with the thread and evidence (web citations, fetched posts): the four hard lines, unsupported claims about real people or recent events, private-person speculation, VVV/DIEM returns. Fails open, logs ERROR. |
+| `finalize.py` | `finalize_reply()`: `fit_x_rules`, the `mentions_token_returns` regex backstop, the gate; one rewrite for an unsupported claim or a token-return figure, otherwise not posted. |
 | `venice_api.py` | Venice chat-completion calls. The two-pass `analyse()` + `craft_tweet()` pipeline, the function-calling tool loop, and the per-lane model cascade. |
 | `x_context.py` | Builds the thread a mention gets: reply chain with authors, `note_tweet` full text, quotes, x.com links via the API, images + video thumbnails. |
 | `x_tools.py` | `XToolbox`: the model's X tools (`x_thread_fetch`, `x_keyword_search`, `x_user_lookup`, `view_image`). Never raises; screens fetched posts for injection. |
@@ -102,8 +103,12 @@ builder and the tool loop without needing credentials.
 - **The uncensored model is abliterated.** It barely refuses, so the prompt's
   HARD LINES are backed in code: the router declines doxxing requests before
   any model runs, and `reply_gate.py` checks every final reply. Don't remove
-  either without replacing it. `is_censored()` still drives fallbacks, so a
-  frank reply that happens to match a refusal pattern costs an extra call.
+  either without replacing it. `is_censored()` drives fallbacks: direct refusals
+  count anywhere, hedges only when they are the whole reply; if every model
+  refuses, nothing posts.
+- **Venice skips web search** when the last user message holds an image or when
+  scraping finds a URL in it. Images ride in their own user message ahead of the
+  text (`_call_venice(image_parts=…)`); keep scraping off.
 - **X self-serve posting rules** reject replies the bot wasn't summoned to,
   posts with more than one cashtag, and @mentions of people outside the
   conversation. `fit_x_rules` handles the last two; keep it on the post path.

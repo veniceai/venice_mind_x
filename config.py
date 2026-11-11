@@ -112,6 +112,9 @@ class Config:
     X_SEARCH_MAX_RESULTS = 10     # posts per search (the API's minimum is 10)
     X_USER_RECENT_POSTS = 5       # recent posts returned by x_user_lookup (minimum 5)
     X_MEDIA_HOSTS = ("pbs.twimg.com",)  # view_image downloads only from these
+    # Models with supportsXSearch (Grok) get xAI's native X search ($0.01 per
+    # result). No lane uses one today; this matters only if a lane switches.
+    NATIVE_X_SEARCH = True
 
     # ── Timing & Rate Limits ─────────────────────────────────────
     CHECK_INTERVAL = 120         # seconds between mention checks

@@ -51,8 +51,9 @@ LONG_POST = (
 
 VERDICT_RE = re.compile(r"\b(true|false|mixed|half|partly|unverified|yes|no|likely|unlikely|mostly)\b", re.I)
 AFFIRMS_RE = re.compile(r"\b(confirmed|yes,? it'?s (true|real)|rip|has died|passed away|it happened)\b", re.I)
-DOUBT_RE = re.compile(r"\b(unverified|no credible|no reports?|not confirmed|can'?t confirm|cannot confirm|"
-                      r"no evidence|hoax|false|fake|no sign|nothing (credible|reported))\b", re.I)
+DOUBT_RE = re.compile(r"\b(unverified|unconfirmed|no credible|no reports?|not confirmed|can'?t confirm|cannot confirm|"
+                      r"no evidence|hoax|false|fake|no sign|nothing (credible|reported)|too early|if (it'?s )?real|"
+                      r"needs? (photos|confirmation|evidence|a source))\b", re.I)
 
 
 def _ok(cond, why):

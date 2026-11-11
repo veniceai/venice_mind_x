@@ -233,6 +233,38 @@ threats or calls for violence, and instructions for mass-casualty weapons.
 `REPLY_GATE_ENABLED=false` turns the gate off; the router decline has no
 switch short of removing it.
 
+### 8. Review fixes (Sabrina, 2026-11-10; Jordan's calls 2026-11-11)
+
+- **Web search was skipped on most threads.** Venice skips search when the
+  last user message holds an image or when scraping finds a URL in it. Probed
+  live: image and question in one message gave 0 citations and a stale answer;
+  the image in its own earlier message gave 10 citations and the current one.
+  Same for a link with scraping on (0) and off (10). Images now ride in their
+  own message; `t.co` links are expanded in `render()`. Scraping off is on
+  Sabrina's branch.
+- **Gate:** three more questions, judged against the thread plus evidence (web
+  citations Venice returns, posts the X tools fetched): unsupported claims about
+  a real person's recent actions, health or death or about a recent event;
+  speculation about a private person; VVV/DIEM return figures. On eleven
+  sample replies the gate flagged all five bad ones (false hospitalization,
+  death hoax, private speculation, DIEM yield, reporting called fabricated)
+  and none of the six good ones. `finalize.py` gives an unsupported claim or a
+  token-return figure one rewrite and a recheck; everything else is dropped.
+  A regex backstop catches yield/APR/APY/ROI or percentages near VVV, sVVV or
+  DIEM, since the gate fails open.
+- **Prompt:** Unverified is a verdict; media framing gets the same skepticism
+  as any source, but reporting is never called false without evidence; claims
+  about real people only as far as sources go. Clear verdicts stay where the
+  evidence is clear (Jordan).
+- **Refusals:** hedges count only when they are the whole reply; if every model
+  refuses, nothing posts.
+- **Fail-open stays** (Jordan): router and gate failures route to DeepSeek and
+  post unchecked, logged at ERROR.
+- **Charged lane:** bake-off of DeepSeek 1017 Uncensored against Grok 4.3 with
+  native X search, `scripts/bakeoff_charged.py`.
+- Sabrina's branch carries scraping off, the date line, the reply log, the
+  pause switch and the length check.
+
 ## Cost per reply (estimate)
 
 See the cost table in [`../OPERATOR.md`](../OPERATOR.md): a typical DeepSeek

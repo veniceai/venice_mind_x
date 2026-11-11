@@ -75,6 +75,7 @@ _TOOL_MARKUP_RE = re.compile(
 
 
 _IMAGES_INTRO = {"type": "text", "text": "Images from the X thread (listed in the next message):"}
+_XAI_NATIVE_TOOL_NAMES = {"x_keyword_search", "x_semantic_search", "x_user_search", "x_thread_fetch"}
 
 
 def _clean_content(text: str) -> str:
@@ -98,6 +99,10 @@ _MODEL_KEYWORDS = (
     "reasoning", "cheapest", "capabilit", "which model", "kimi", "glm",
     "qwen", "deepseek", "uncensored", "multimodal",
 )
+
+
+def _without_handles(text: str) -> str:
+    return re.sub(r"@\w+", " ", text)
 
 
 def _is_venice_topic(text: str) -> bool:
@@ -177,6 +182,11 @@ def _chat(
     }
     if reasoning_effort and _supports(model, "supportsReasoningEffort", False):
         payload["reasoning_effort"] = reasoning_effort
+    if web and Config.NATIVE_X_SEARCH and _supports(model, "supportsXSearch", False):
+        # xAI's own X search (Grok models). It reserves its tool names, so the
+        # bot's tools with the same names are left out.
+        payload["venice_parameters"]["enable_x_search"] = True
+        tools = [t for t in tools or [] if t["function"]["name"] not in _XAI_NATIVE_TOOL_NAMES]
     if tools:
         payload["tools"] = tools
         if tool_choice:
@@ -351,7 +361,10 @@ def analyse(
         msg += f"\n\n{url_context}"
 
     # ── Authoritative Venice knowledge injection ──
-    full_topic_text = f"{query} {context or ''}"
+    # @handles aren't topics: every rendered thread contains @venice_mind, and
+    # counting it injected the FAQ (and its links, which stop web search while
+    # scraping is on) into every reply.
+    full_topic_text = _without_handles(f"{query} {context or ''}")
     knowledge_parts = []
     if _is_venice_topic(full_topic_text):
         faqs = relevant_faqs(query, context)
@@ -400,7 +413,7 @@ def analyse(
 
     # ── Determine if we should force web search ──
     # Queries about prices, current events, Venice updates, etc. need fresh data
-    force_search = _needs_fresh_data(full_text)
+    force_search = _needs_fresh_data(full_topic_text)
     if force_search:
         logger.info("🔍 Query needs fresh data — forcing web search")
 

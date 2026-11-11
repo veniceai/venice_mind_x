@@ -64,7 +64,7 @@ def venice(monkeypatch):
     def install(script, lane=UNBIASED):
         fake = FakeVenice(script)
         monkeypatch.setattr(venice_api.requests, "post", fake.post)
-        monkeypatch.setattr(venice_api, "_supports", lambda model, cap, default: True)
+        monkeypatch.setattr(venice_api, "_supports", lambda model, cap, default: cap != "supportsXSearch")
         monkeypatch.setattr(venice_api, "route", lambda *a, **k: Route(lane))
         return fake
     return install
@@ -130,6 +130,19 @@ def test_leaked_reasoning_before_think_close_is_dropped(venice):
     assert out == "[FINAL_REPLY]final[/FINAL_REPLY]"
 
 
+def test_grok_gets_native_x_search_without_colliding_tool_names(venice, monkeypatch):
+    # xAI rejects requests that also define x_keyword_search / x_thread_fetch.
+    fake = venice({"grok-4-3": [_answer("ok")]})
+    monkeypatch.setattr(venice_api, "_supports", lambda model, cap, default: True)
+    from x_tools import TOOL_SCHEMAS
+    box = FakeToolbox()
+    box.schemas = lambda: TOOL_SCHEMAS
+    venice_api._call_venice("grok-4-3", "sys", "q", toolbox=box)
+    sent = fake.payloads[0]
+    assert sent["venice_parameters"]["enable_x_search"] is True
+    assert [t["function"]["name"] for t in sent["tools"]] == ["x_user_lookup", "view_image"]
+
+
 def test_no_toolbox_means_no_tools(venice):
     fake = venice({Config.MODEL_UNBIASED: [_answer("plain")]})
     assert venice_api._call_venice(Config.MODEL_UNBIASED, "sys", "q") == "plain"
@@ -139,7 +152,7 @@ def test_no_toolbox_means_no_tools(venice):
 def test_reasoning_effort_only_for_models_that_support_it(venice, monkeypatch):
     fake = venice({Config.MODEL_LAST_RESORT: [_answer("ok")]})
     monkeypatch.setattr(venice_api, "_supports",
-                        lambda model, cap, default: cap != "supportsReasoningEffort")
+                        lambda model, cap, default: cap not in ("supportsReasoningEffort", "supportsXSearch"))
     venice_api._call_venice(Config.MODEL_LAST_RESORT, "sys", "q", reasoning_effort="high")
     assert "reasoning_effort" not in fake.payloads[0]
 
@@ -219,6 +232,23 @@ def test_dox_request_declines_without_calling_a_model(venice, monkeypatch):
     assert Config.DECLINE_PRIVATE_INFO in out
     assert fake.payloads == []
     assert venice_api.craft_tweet(out) == Config.DECLINE_PRIVATE_INFO
+
+
+def test_bot_handle_in_the_thread_does_not_pull_in_the_venice_faq(venice):
+    fake = venice({Config.MODEL_UNBIASED: [_answer("ok")]})
+    venice_api.analyse(
+        "is Pope Francis still alive?",
+        context="X THREAD (oldest first):\n[1] @carol · post 1 · TAGGED YOU\n@venice_mind is Pope Francis still alive?",
+    )
+    text = fake.payloads[0]["messages"][-1]["content"]
+    assert "AUTHORITATIVE VENICE FACTS" not in text
+    assert fake.payloads[0]["venice_parameters"]["enable_web_search"] == "auto"
+
+
+def test_a_real_venice_question_still_gets_the_faq(venice):
+    fake = venice({Config.MODEL_UNBIASED: [_answer("ok")]})
+    venice_api.analyse("what is DIEM?", context="X THREAD (oldest first):\n[1] @carol · post 1\n@venice_mind what is DIEM?")
+    assert "AUTHORITATIVE VENICE FACTS" in fake.payloads[0]["messages"][-1]["content"]
 
 
 def test_crafter_runs_on_deepseek_without_web(venice):

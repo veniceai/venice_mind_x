@@ -14,7 +14,9 @@ operator needs (X App and credits, keys, Venice key, hosting, costs, first run).
   (most questions), Kimi K3 only for math, code and technical deep-dives that
   aren't
 - **Uncensored, unbiased voice** — frank answers on any topic, a clear verdict
-  where the evidence lands, no side gets a pass; a short list of hard lines
+  where the evidence lands (or Unverified), no side gets a pass; a final check on
+  every reply for hard lines, unsupported claims about real people, and VVV/DIEM
+  return figures; plus a short list of hard lines
   (minors, doxxing, threats, mass-casualty weapons) checked on every reply
 - **Reads the whole thread** — every post in the reply chain with its author,
   long posts in full, quoted and linked posts, photos and video thumbnails
@@ -79,7 +81,8 @@ twitter_bot_venice/
 ├── bot.py               # Mention polling + processing
 ├── config.py            # Models, prompts, settings
 ├── router.py            # Clef lane routing
-├── reply_gate.py        # Hard-line check on the final reply
+├── reply_gate.py        # Clef check on the final reply (hard lines, facts, token returns)
+├── finalize.py          # X rules + token backstop + gate, one rewrite
 ├── venice_api.py        # Venice API calls, tool loop, model cascade
 ├── x_context.py         # The thread a mention gets (chain, quotes, links, media)
 ├── x_tools.py           # X tools the model can call
@@ -100,7 +103,7 @@ tokens, from the Venice catalog on 2026-11-10.
 | `kimi-k3` | Complex lane (reasoning effort `high`) | $3.75 / $18.75 |
 | `deepseek-v4-1-flash-uncensored` | Fallback | $0.33 / $1.32 |
 | `venice-uncensored-1-2` | Last resort | $0.20 / $0.90 |
-| `clef-api` | Router and hard-line gate (private decision model) | $0.05 / $0.05 |
+| `clef-api` | Router and final-reply gate (private decision model) | $0.05 / $0.05 |
 
 Clef asks four yes/no questions per mention: is it charged (contested,
 political, a disputed claim), is it a topic a filtered model would dodge (drugs,
