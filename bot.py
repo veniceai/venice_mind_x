@@ -10,8 +10,8 @@ import tweepy
 from config import Config
 from state import State
 from clients import get_twitter_client
-from reply_gate import crossed_line
-from twitter_client import fit_x_rules, get_mentions, reply_to_tweet, TweetCache
+from finalize import finalize_reply
+from twitter_client import get_mentions, reply_to_tweet, TweetCache
 from venice_api import analyse, craft_tweet
 from venice_knowledge import validate_configured_models
 from x_context import build_context, question_text
@@ -30,6 +30,10 @@ class VeniceBot:
         self.session_start = datetime.now(timezone.utc)
         if Config.DRY_RUN:
             logger.warning("DRY_RUN is on — replies are logged, not posted.")
+        if not Config.ROUTER_ENABLED:
+            logger.error("ROUTER_ENABLED is off — every mention goes to DeepSeek and doxxing requests aren't declined.")
+        if not Config.REPLY_GATE_ENABLED:
+            logger.error("REPLY_GATE_ENABLED is off — replies post without the hard-line and fact checks.")
 
         # Cache immutable thread-context lookups (parent/root/quoted tweets) so
         # they aren't re-fetched from the API on every reply in a thread.
@@ -182,12 +186,14 @@ class VeniceBot:
         )
 
         # ── Generate reply ──
+        evidence: list = []
         analysis = analyse(
             question_text(ctx, self.bot_username),
             context=ctx.render(),
             images=ctx.images,
             urls=ctx.urls,
             toolbox=toolbox,
+            evidence=evidence,
         )
         if analysis == Config.ERROR_MESSAGE:
             logger.warning(f"Analysis failed for tweet {tweet.id}")
@@ -198,9 +204,12 @@ class VeniceBot:
         if not final or final == Config.ERROR_MESSAGE:
             logger.warning(f"Crafting failed for tweet {tweet.id}")
             return
-        final = fit_x_rules(final, ctx.participants())
-        if crossed_line(final):
-            logger.warning(f"Not replying to {tweet.id}: the reply crosses a hard line")
+        final, failed = finalize_reply(
+            final, thread=ctx.render(), sources="\n".join(evidence + toolbox.evidence),
+            participants=ctx.participants(),
+        )
+        if not final:
+            logger.warning(f"Not replying to {tweet.id}: the reply fails the {failed} check")
             self.state.add_tweet(tweet.id)
             return
 

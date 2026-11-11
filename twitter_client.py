@@ -95,15 +95,22 @@ def get_mentions(
 # twitter-text's cashtag shape: $ + 1-6 letters, optional ._ suffix.
 _CASHTAG_RE = re.compile(r"(?<![\w$])\$([A-Za-z]{1,6}(?:[._][A-Za-z]{1,2})?)(?![\w])")
 _HANDLE_RE = re.compile(r"(?<![\w@])@(\w{1,15})\b")
+# Links with a scheme, and schemeless links with a path. Bare domains such as
+# venice.ai (in the scam warnings) stay.
+_LINK_RE = re.compile(
+    r"https?://\S+|(?<![@\w.])(?:[a-z0-9-]+\.)+[a-z]{2,}/[^\s'\"()]*", re.IGNORECASE
+)
 
 
 def fit_x_rules(text: str, participants=()) -> str:
-    """Make a reply acceptable to X's self-serve posting rules.
+    """Make a reply acceptable to X's self-serve posting rules, and cheap.
 
     X rejects API posts with more than one cashtag, and only lets API posts
     @mention accounts already in the conversation. Extra cashtags lose their $;
-    @handles outside `participants` lose their @.
+    @handles outside `participants` lose their @. Links are removed: a post
+    with a URL costs $0.20 against $0.01 for a summoned reply.
     """
+    text = re.sub(r"[ \t]{2,}", " ", _LINK_RE.sub("", text)).strip()
     seen = {"n": 0}
 
     def cashtag(m):

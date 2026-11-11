@@ -13,9 +13,9 @@ from typing import Optional
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from clients import get_twitter_client
-from reply_gate import crossed_line
+from finalize import finalize_reply
 from router import route
-from twitter_client import fit_x_rules, get_tweet_by_id, reply_to_tweet, TweetCache
+from twitter_client import get_tweet_by_id, reply_to_tweet, TweetCache
 from venice_api import analyse, craft_tweet
 from safety import classify_url
 from x_context import build_context, question_text
@@ -64,17 +64,22 @@ def main():
     print(f"🧭 Lane: {r.lane} (charged={r.charged}, filtered={r.filtered}, complex={r.complex}) {r.reason}")
 
     toolbox = XToolbox(client, cache, bot_id=me.id)
+    evidence: list = []
     print("🤖 Analysing …")
-    analysis = analyse(query, context=ctx.render(), images=ctx.images, urls=ctx.urls, toolbox=toolbox)
+    analysis = analyse(query, context=ctx.render(), images=ctx.images, urls=ctx.urls,
+                       toolbox=toolbox, evidence=evidence)
     print("✍️ Crafting tweet …")
-    final = craft_tweet(
+    drafted = craft_tweet(
         analysis, use_vision=bool(ctx.images),
         context_urls=ctx.urls + ctx.permalinks + toolbox.permalinks,
     )
-    final = fit_x_rules(final, ctx.participants())
-    line = crossed_line(final)
+    final, line = finalize_reply(
+        drafted, thread=ctx.render(), sources="\n".join(evidence + toolbox.evidence),
+        participants=ctx.participants(),
+    )
     if line:
-        print(f"⛔ The reply crosses a hard line ({line}); the bot would not post it.")
+        print(f"⛔ The reply fails the {line} check; the bot would not post it. Draft:\n{drafted}")
+        final = drafted
 
     print(f"\n{'=' * 60}")
     print(f"🎯 RESPONSE ({len(final)} chars, {toolbox.posts_fetched} post(s) fetched by tools):")

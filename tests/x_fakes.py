@@ -27,7 +27,7 @@ def tweet(tid, text, author_id, *, reply_to=None, quote_of=None, conversation_id
         conversation_id=conversation_id or tid,
         referenced_tweets=refs or None,
         attachments={"media_keys": list(media_keys)} if media_keys else None,
-        entities={"urls": [{"expanded_url": u} for u in urls]} if urls else None,
+        entities={"urls": [u if isinstance(u, dict) else {"expanded_url": u} for u in urls]} if urls else None,
         data=raw,
     )
 

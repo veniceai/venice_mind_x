@@ -112,6 +112,7 @@ class XToolbox:
         self.bot_id = bot_id
         self.downloader = downloader
         self.permalinks: List[str] = []
+        self.evidence: List[str] = []   # fetched posts, for the reply gate
         self.posts_fetched = 0
         self.calls = 0
         self._images: List[XImage] = []
@@ -172,6 +173,7 @@ class XToolbox:
         text = p.text if is_safe else WITHHELD
         if len(text) > _POST_TEXT_MAX:
             text = text[:_POST_TEXT_MAX] + " …"
+        self.evidence.append(f"[X] {p.author} ({p.created_at}): {text}")
         d = {"id": p.id, "author": p.author, "created_at": p.created_at, "text": text, "link": p.permalink}
         if p.reply_to:
             d["reply_to"] = p.reply_to

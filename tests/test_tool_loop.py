@@ -98,9 +98,10 @@ def test_view_image_results_are_attached_as_a_user_message(venice):
     fake = venice({Config.MODEL_UNBIASED: [_tool_call(), _answer("saw it")]})
     box = FakeToolbox(images=[XImage(b"\xff\xd8", "image/jpeg", "image from https://pbs.twimg.com/a.jpg")])
     venice_api._call_venice(Config.MODEL_UNBIASED, "sys", "q", toolbox=box)
-    last = fake.payloads[1]["messages"][-1]
-    assert last["role"] == "user"
-    assert last["content"][1]["image_url"]["url"].startswith("data:image/jpeg;base64,")
+    msgs = fake.payloads[1]["messages"]
+    assert msgs[-2]["role"] == "user"
+    assert msgs[-2]["content"][1]["image_url"]["url"].startswith("data:image/jpeg;base64,")
+    assert msgs[-1] == {"role": "user", "content": "Continue with the question above."}
 
 
 DSML = '<｜DSML｜ calls>\n<｜DSML｜ invoke name="x_user_lookup">NASA</｜DSML｜ invoke>\n</｜DSML｜ calls>'
@@ -176,12 +177,24 @@ def test_kimi_refusal_moves_to_deepseek(venice):
     assert [p["model"] for p in fake.payloads] == [Config.MODEL_COMPLEX, Config.MODEL_UNBIASED]
 
 
-def test_images_go_in_as_data_uris(venice):
+def test_images_ride_in_their_own_message_before_the_text(venice):
+    # Venice skips web search when the last user message holds an image.
     fake = venice({Config.MODEL_UNBIASED: [_answer("ok")]})
     venice_api.analyse("what is this?", images=[XImage(b"\x89PNG", "image/png", "photo")])
-    content = fake.payloads[0]["messages"][1]["content"]
-    assert content[0]["type"] == "text"
-    assert content[1]["image_url"]["url"].startswith("data:image/png;base64,")
+    msgs = fake.payloads[0]["messages"]
+    assert [m["role"] for m in msgs] == ["system", "user", "user"]
+    assert msgs[1]["content"][1]["image_url"]["url"].startswith("data:image/png;base64,")
+    assert isinstance(msgs[2]["content"], str) and "what is this?" in msgs[2]["content"]
+
+
+def test_every_model_refusing_posts_nothing(venice):
+    refusal = _answer("I'm sorry, but I can't help with that.")
+    venice({
+        Config.MODEL_UNBIASED: [refusal],
+        Config.MODEL_FALLBACK: [refusal],
+        Config.MODEL_LAST_RESORT: [refusal],
+    })
+    assert venice_api.analyse("question") == Config.ERROR_MESSAGE
 
 
 def test_length_rule_uses_the_reply_target_on_premium(venice, monkeypatch):

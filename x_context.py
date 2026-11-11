@@ -42,6 +42,26 @@ def full_text(tweet) -> str:
     return getattr(tweet, "text", "") or ""
 
 
+_MEDIA_LINK_RE = re.compile(r"/status(?:es)?/\d+/(?:photo|video)/\d+")
+
+
+def expand_links(text: str, tweet) -> str:
+    """Swap t.co short links for their real URLs; drop links to the post's own media."""
+    raw = getattr(tweet, "data", None)
+    note = raw.get("note_tweet") if isinstance(raw, dict) else None
+    entity_sets = [getattr(tweet, "entities", None) or {}]
+    if isinstance(note, dict):
+        entity_sets.append(note.get("entities") or {})
+    for entities in entity_sets:
+        for u in entities.get("urls", []) or []:
+            short = u.get("url")
+            real = u.get("unwound_url") or u.get("expanded_url")
+            if not short or not real or short not in text:
+                continue
+            text = text.replace(short, "" if _MEDIA_LINK_RE.search(real) else real)
+    return re.sub(r"[ \t]{2,}", " ", text).strip()
+
+
 def _fmt_time(value) -> Optional[str]:
     if not value:
         return None
@@ -125,7 +145,7 @@ def post_from(tweet, includes: Optional[dict] = None, bot_id=None, *, with_quote
 
     post = XPost(
         id=str(tweet.id),
-        text=full_text(tweet),
+        text=expand_links(full_text(tweet), tweet),
         username=getattr(user, "username", None),
         name=getattr(user, "name", None),
         created_at=_fmt_time(getattr(tweet, "created_at", None)),

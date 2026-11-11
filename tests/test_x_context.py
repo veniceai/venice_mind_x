@@ -153,3 +153,13 @@ def test_post_from_handles_missing_includes():
     p = post_from(tweet(9, "hi", 77), None)
     assert p.username is None and p.author == "unknown author"
     assert p.permalink == "https://x.com/i/web/status/9"
+
+
+def test_tco_links_expand_and_media_links_drop():
+    mention = tweet(102, "@venice_mind is this real? https://t.co/aaa https://t.co/ppp", 3, urls=[
+        {"url": "https://t.co/aaa", "expanded_url": "https://example.com/report"},
+        {"url": "https://t.co/ppp", "expanded_url": "https://x.com/carol/status/102/photo/1"},
+    ])
+    ctx = build_context(FakeCache(), mention, {"users": [CAROL]}, bot_id=BOT_ID)
+    assert ctx.mention.text == "@venice_mind is this real? https://example.com/report"
+    assert "t.co" not in ctx.render()

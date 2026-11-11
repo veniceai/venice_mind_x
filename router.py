@@ -121,7 +121,7 @@ def route(query: str, context: Optional[str] = None, has_image: bool = False) ->
         complex_ = float(answers["complex"]["noul"])
         private_info = float(answers["private_info"]["noul"])
     except Exception as e:
-        logger.warning(f"Router ({Config.MODEL_ROUTER}) failed ({e}); using the uncensored lane")
+        logger.error(f"Router ({Config.MODEL_ROUTER}) failed ({e}); using the uncensored lane, no doxxing check")
         return Route(UNBIASED, reason=f"router error: {e}")
 
     r = Route(choose_lane(charged, filtered, complex_), charged, filtered, complex_, private_info)

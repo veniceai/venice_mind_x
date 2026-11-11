@@ -1,7 +1,7 @@
 """
 Venice AI API integration — analysis + tweet crafting.
-Jev routes each mention to a lane (router.py): DeepSeek V4.1 Flash 1017
-Uncensored for unbiased answers, Kimi K3 for complex ones. The analysis model
+Clef routes each mention to a lane (router.py): DeepSeek V4.1 Flash 1017
+Uncensored for contested and taboo questions, Kimi K3 for complex ones. The analysis model
 can call X tools (x_tools.py) through Venice function calling.
 Includes anti-scam URL screening, output scanning, and censorship detection.
 """
@@ -72,6 +72,9 @@ def _strip_refs(text: str) -> str:
 _TOOL_MARKUP_RE = re.compile(
     r"<\s*[｜|]\s*DSML\s*[｜|]|<\s*/?\s*(?:tool_call|function_calls?|invoke)\b", re.IGNORECASE
 )
+
+
+_IMAGES_INTRO = {"type": "text", "text": "Images from the X thread (listed in the next message):"}
 
 
 def _clean_content(text: str) -> str:
@@ -160,8 +163,12 @@ def _chat(
     reasoning_effort: Optional[str] = None,
     tools: Optional[list] = None,
     tool_choice: Optional[str] = None,
+    evidence: Optional[list] = None,
 ) -> Optional[dict]:
-    """One chat completion request. Returns the assistant message dict or None."""
+    """One chat completion request. Returns the assistant message dict or None.
+
+    Web search citations Venice returns are appended to `evidence` for the gate.
+    """
     payload = {
         "model": model,
         "temperature": temperature,
@@ -180,7 +187,11 @@ def _chat(
             timeout=Config.VENICE_REQUEST_TIMEOUT_SECONDS,
         )
         r.raise_for_status()
-        return r.json()["choices"][0]["message"]
+        body = r.json()
+        if evidence is not None:
+            for c in (body.get("venice_parameters") or {}).get("web_search_citations") or []:
+                evidence.append(f"[web] {c.get('title')} ({c.get('date')}): {c.get('content')} {c.get('url')}")
+        return body["choices"][0]["message"]
     except requests.exceptions.HTTPError as e:
         status = e.response.status_code if e.response is not None else None
         hint = _http_error_hint(status) if status else None
@@ -207,16 +218,21 @@ def _call_venice(
     reasoning_effort: Optional[str] = None,
     toolbox=None,
     web: bool = True,
+    image_parts: Optional[list] = None,
+    evidence: Optional[list] = None,
 ) -> Optional[str]:
     """Run a completion, executing the model's X tool calls when a toolbox is given.
 
     Returns the final reply text (refs stripped) or None. The last allowed turn
     sets tool_choice "none" so the model has to answer with what it gathered.
+
+    Venice skips web search when the last user message holds an image, so
+    `image_parts` go in their own user message ahead of the text.
     """
-    messages = [
-        {"role": "system", "content": system},
-        {"role": "user", "content": user_content},
-    ]
+    messages = [{"role": "system", "content": system}]
+    if image_parts:
+        messages.append({"role": "user", "content": [_IMAGES_INTRO] + image_parts})
+    messages.append({"role": "user", "content": user_content})
     use_tools = (
         toolbox is not None
         and Config.X_TOOLS_ENABLED
@@ -232,6 +248,7 @@ def _call_venice(
             force_search=force_search, web=web, reasoning_effort=reasoning_effort,
             tools=toolbox.schemas() if use_tools else None,
             tool_choice="none" if use_tools and last else None,
+            evidence=evidence,
         )
         if msg is None:
             return None
@@ -266,6 +283,8 @@ def _call_venice(
                              + "; ".join(img.label for img in images)}]
                 + [{"type": "image_url", "image_url": {"url": img.data_uri()}} for img in images],
             })
+            # A text-only last user message keeps web search running.
+            messages.append({"role": "user", "content": "Continue with the question above."})
     return None
 
 
@@ -280,6 +299,7 @@ def analyse(
     images: Optional[list] = None,
     urls: Optional[List[str]] = None,
     toolbox=None,
+    evidence: Optional[list] = None,
 ) -> str:
     """
     Step 1: Analyse the user's query with full context.
@@ -370,18 +390,13 @@ def analyse(
         f"{length_rule}"
     )
 
-    # ── Build multimodal content if images are present ──
-    if has_image:
-        parts = [{"type": "text", "text": msg}]
-        parts += [{"type": "image_url", "image_url": {"url": img.data_uri()}} for img in images]
-        if image_url:
-            parts.append({"type": "image_url", "image_url": {"url": image_url}})
-        elif image_bytes:
-            b64 = base64.b64encode(image_bytes).decode()
-            parts.append({"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64}"}})
-        content = parts
-    else:
-        content = msg
+    # ── Images ride in their own message (see _call_venice) ──
+    image_parts = [{"type": "image_url", "image_url": {"url": img.data_uri()}} for img in images]
+    if image_url:
+        image_parts.append({"type": "image_url", "image_url": {"url": image_url}})
+    elif image_bytes:
+        b64 = base64.b64encode(image_bytes).decode()
+        image_parts.append({"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64}"}})
 
     # ── Determine if we should force web search ──
     # Queries about prices, current events, Venice updates, etc. need fresh data
@@ -395,28 +410,26 @@ def analyse(
         logger.warning(f"🔒 Declining a request for someone's private details: {query[:80]}")
         return f"[FINAL_REPLY]{Config.DECLINE_PRIVATE_INFO}[/FINAL_REPLY]"
     lane = r.lane
-    result = censored = None
+    result = None
     for model, effort in _lane_chain(lane):
         out = _call_venice(
-            model, Config.ANALYST_PROMPT, content,
+            model, Config.ANALYST_PROMPT, msg,
             urls=safe_urls or None, force_search=force_search,
-            reasoning_effort=effort, toolbox=toolbox,
+            reasoning_effort=effort, toolbox=toolbox, image_parts=image_parts,
+            evidence=evidence,
         )
         if not out:
             logger.warning(f"{model} returned nothing — trying the next model")
             continue
         if is_censored(out):
             logger.info(f"🔓 {model} refused — trying the next model")
-            censored = out
             continue
         logger.info(f"Answered with {model} ({lane} lane)")
         result = out
         break
 
-    if not result and censored:
-        logger.warning("🔓 Every model refused — using the last response as-is")
-        result = censored
-
+    if not result:
+        logger.warning("No model gave a usable answer (errors or refusals); not replying")
     return result or Config.ERROR_MESSAGE
 
 
@@ -495,3 +508,32 @@ def craft_tweet(
         return get_scam_warning_reply()
 
     return result
+
+
+_REWRITE_INSTRUCTIONS = {
+    "unsupported": (
+        "Rewrite this reply so that every claim about a real person or a recent event "
+        "that isn't backed by a source is labelled Unverified or removed. Keep the rest "
+        "as it is, including any verdict the evidence does support."
+    ),
+    "token_returns": (
+        "Rewrite this reply without any yield, return, APR, APY, ROI or percentage figure "
+        "for VVV, sVVV or DIEM. Keep the rest as it is."
+    ),
+}
+
+
+def rewrite_reply(reply: str, failed_check: str) -> Optional[str]:
+    """One rewrite for a reply the gate stopped on a fixable check, else None."""
+    instruction = _REWRITE_INSTRUCTIONS.get(failed_check)
+    if not instruction:
+        return None
+    out = _call_venice(
+        Config.MODEL_UNBIASED, Config.CRAFTER_PROMPT,
+        f"{instruction} Stay under {Config.reply_target()} characters.\n\nREPLY:\n{reply}",
+        temperature=0.4, web=False, reasoning_effort=Config.REASONING_EFFORT_CRAFTER,
+    )
+    if out:
+        m = _FINAL_RE.search(out)
+        out = _strip_refs(m.group(1).strip()) if m else out
+    return out or None
