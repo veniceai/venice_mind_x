@@ -143,7 +143,7 @@ Key settings in `config.py`:
 The bot includes multi-layer anti-scam protection:
 
 1. **URL screening** — classifies URLs as trusted/suspicious/blocked
-2. **Selective scraping** — only trusted domains are scraped
+2. **No scraping**: Venice's URL scraping stays off (it would also turn off web search), so no link is fetched; the model sees the expanded links in the thread instead
 3. **Prompt hardening** — AI knows only venice.ai is official
 4. **Output scanning** — blocks replies that endorse scam URLs
 

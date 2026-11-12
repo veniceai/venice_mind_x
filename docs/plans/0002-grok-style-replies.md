@@ -240,8 +240,8 @@ switch short of removing it.
   live: image and question in one message gave 0 citations and a stale answer;
   the image in its own earlier message gave 10 citations and the current one.
   Same for a link with scraping on (0) and off (10). Images now ride in their
-  own message; `t.co` links are expanded in `render()`. Scraping off is on
-  Sabrina's branch.
+  own message; `t.co` links are expanded in `render()`; scraping is off in
+  `_venice_params` and the unused `web_search_urls` is gone.
 - **Gate:** three more questions, judged against the thread plus evidence (web
   citations Venice returns, posts the X tools fetched): unsupported claims about
   a real person's recent actions, health or death or about a recent event;

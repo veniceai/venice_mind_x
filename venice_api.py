@@ -136,32 +136,31 @@ def _lane_chain(lane: str) -> List[tuple]:
     return unbiased
 
 
-def _venice_params(urls: Optional[List[str]] = None, force_search: bool = False, web: bool = True) -> dict:
+def _venice_params(force_search: bool = False, web: bool = True) -> dict:
     """
-    Standard Venice parameters with web search + scraping.
+    Standard Venice parameters with web search.
 
     force_search=True will always enable web search (for time-sensitive queries).
-    Otherwise uses 'auto' to let Venice decide. web=False turns search and
-    scraping off (the crafting rewrite doesn't need them).
+    Otherwise uses 'auto' to let Venice decide. web=False turns search off (the
+    crafting rewrite doesn't need it).
+
+    Scraping stays off: when scraping finds a URL in the last user message,
+    Venice skips web search entirely, and rendered threads usually carry links.
 
     Note: Venice API expects string values 'on'/'off'/'auto' for enable_web_search.
     """
-    params = {
+    return {
         "enable_web_search": ("on" if force_search else "auto") if web else "off",
-        "enable_web_scraping": web,
+        "enable_web_scraping": False,
         "enable_web_citations": False,
         "include_venice_system_prompt": False,
     }
-    if urls and web:
-        params["web_search_urls"] = urls
-    return params
 
 
 def _chat(
     model: str,
     messages: list,
     *,
-    urls: Optional[List[str]] = None,
     temperature: float = 0.7,
     force_search: bool = False,
     web: bool = True,
@@ -178,7 +177,7 @@ def _chat(
         "model": model,
         "temperature": temperature,
         "messages": messages,
-        "venice_parameters": _venice_params(urls, force_search=force_search, web=web),
+        "venice_parameters": _venice_params(force_search=force_search, web=web),
     }
     if reasoning_effort and _supports(model, "supportsReasoningEffort", False):
         payload["reasoning_effort"] = reasoning_effort
@@ -221,7 +220,6 @@ def _call_venice(
     model: str,
     system: str,
     user_content,
-    urls: Optional[List[str]] = None,
     temperature: float = 0.7,
     force_search: bool = False,
     *,
@@ -254,7 +252,7 @@ def _call_venice(
     while turn <= rounds:
         last = turn == rounds
         msg = _chat(
-            model, messages, urls=urls, temperature=temperature,
+            model, messages, temperature=temperature,
             force_search=force_search, web=web, reasoning_effort=reasoning_effort,
             tools=toolbox.schemas() if use_tools else None,
             tool_choice="none" if use_tools and last else None,
@@ -326,8 +324,9 @@ def analyse(
 
     SAFETY:
     - INPUT PRE-SCREENING: Token creation injection attempts are blocked immediately
-    - URLs are pre-screened. Suspicious/blocked URLs are NOT scraped —
-      instead the AI is told they're unverified/scam so it can warn the user.
+    - URLs are pre-screened. Blocked URLs get a scam warning without any model
+      call; suspicious ones are flagged to the AI so it can warn the user.
+      Nothing is scraped.
     """
     char_limit = Config.char_limit()
     target = Config.reply_target()
@@ -362,8 +361,7 @@ def analyse(
 
     # ── Authoritative Venice knowledge injection ──
     # @handles aren't topics: every rendered thread contains @venice_mind, and
-    # counting it injected the FAQ (and its links, which stop web search while
-    # scraping is on) into every reply.
+    # counting it injected the FAQ into every reply.
     full_topic_text = _without_handles(f"{query} {context or ''}")
     knowledge_parts = []
     if _is_venice_topic(full_topic_text):
@@ -427,7 +425,7 @@ def analyse(
     for model, effort in _lane_chain(lane):
         out = _call_venice(
             model, Config.ANALYST_PROMPT, msg,
-            urls=safe_urls or None, force_search=force_search,
+            force_search=force_search,
             reasoning_effort=effort, toolbox=toolbox, image_parts=image_parts,
             evidence=evidence,
         )

@@ -3,8 +3,8 @@
 
 Runs the eval's charged scenarios through the full pipeline twice, swapping
 only the analysis model of the uncensored lane; routing, the crafter (DeepSeek)
-and the gate stay the same. Web scraping is turned off for both, as on
-Sabrina's branch, so link threads get web search. X is faked for the bot's own
+and the gate stay the same. Web scraping is off for both, as in the bot, so
+link threads get web search. X is faked for the bot's own
 X tools; Grok's native X search reads live X. Writes a markdown table.
 
     python scripts/bakeoff_charged.py --image photo.png --out bakeoff.md
@@ -28,16 +28,8 @@ CHARGED = ["factcheck", "one-word", "lab-leak", "gossip", "breaking", "death-hoa
 # Grok gets xAI's native X search from venice_api (Config.NATIVE_X_SEARCH).
 VARIANTS = ["deepseek-v4-1-flash-1017-uncensored", "grok-4-3"]
 
-_real_params = venice_api._venice_params
 _real_post = requests.post
 usage = []
-
-
-def _params(urls=None, force_search=False, web=True):
-    p = _real_params(urls, force_search=force_search, web=web)
-    p["enable_web_scraping"] = False
-    p.pop("web_search_urls", None)
-    return p
 
 
 def _post(url, json=None, **kw):
@@ -85,7 +77,6 @@ def main():
             del args[i:i + 2]
     image_path = opts.get("--image")
     only = set(args)
-    venice_api._venice_params = _params
     venice_api.requests.post = _post
 
     scenarios = {s.name: s for s in ev.scenarios()}

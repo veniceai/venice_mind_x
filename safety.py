@@ -371,12 +371,12 @@ def screen_urls(urls: List[str]) -> Tuple[List[str], List[str], List[str]]:
     """
     Screen a list of URLs. Returns (safe_urls, suspicious_urls, blocked_urls).
     
-    - Safe: official Venice domains, passed to AI for scraping
+    - Safe: official Venice domains and unrelated sites; no warning needed
     - Suspicious: Venice lookalikes or scam patterns, AI will warn user
     - Blocked: known scam domains, AI will refuse
-    
-    Unknown URLs (random websites unrelated to Venice) are treated as safe
-    to scrape — we only warn about URLs that look like Venice impersonation.
+
+    Unknown URLs (random websites unrelated to Venice) count as safe: we only
+    warn about URLs that look like Venice impersonation. Nothing is scraped.
     """
     safe = []
     suspicious = []
@@ -393,8 +393,8 @@ def screen_urls(urls: List[str]) -> Tuple[List[str], List[str], List[str]]:
             suspicious.append(url)
             logger.warning(f"⚠️ SUSPICIOUS URL (Venice lookalike or scam pattern): {url}")
         else:
-            # Unknown URLs that don't look like Venice impersonation are fine
-            # We allow scraping them normally — no need to warn the user
+            # Unknown URLs that don't look like Venice impersonation are fine;
+            # no need to warn the user
             safe.append(url)
 
     return safe, suspicious, blocked

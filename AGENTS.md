@@ -108,7 +108,10 @@ builder and the tool loop without needing credentials.
   refuses, nothing posts.
 - **Venice skips web search** when the last user message holds an image or when
   scraping finds a URL in it. Images ride in their own user message ahead of the
-  text (`_call_venice(image_parts=…)`); keep scraping off.
+  text (`_call_venice(image_parts=…)`), and `_venice_params` keeps scraping off;
+  don't turn it back on. Venice also drops unknown `venice_parameters` keys
+  without an error (the old `web_search_urls` never did anything), so check the
+  docs before adding one.
 - **X self-serve posting rules** reject replies the bot wasn't summoned to,
   posts with more than one cashtag, and @mentions of people outside the
   conversation. `fit_x_rules` handles the last two; keep it on the post path.
@@ -122,8 +125,8 @@ builder and the tool loop without needing credentials.
   pay-per-use plans.
 - **Several Venice calls per reply.** The Clef route, then `analyse()` (one call
   per tool round, up to `X_TOOL_MAX_ROUNDS + 1`), then `craft_tweet()` on the
-  rewrite path, then the Clef gate. Web search ($0.01) and scraping ($0.01 per
-  URL) can bill on every analysis call. `analyse()` usually emits a `[FINAL_REPLY]` block that
+  rewrite path, then the Clef gate. Web search ($0.01) can bill on every
+  analysis call. `analyse()` usually emits a `[FINAL_REPLY]` block that
   `craft_tweet()` uses directly. Cost/latency live here.
 - **`state.json` is committed to git despite being in `.gitignore`** (it was
   tracked before the ignore rule). Running the bot dirties the working tree.

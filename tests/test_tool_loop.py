@@ -158,9 +158,19 @@ def test_reasoning_effort_only_for_models_that_support_it(venice, monkeypatch):
 
 
 def test_crafter_turns_web_search_off():
-    params = venice_api._venice_params(["https://example.com"], web=False)
+    params = venice_api._venice_params(web=False)
     assert params["enable_web_search"] == "off" and params["enable_web_scraping"] is False
     assert "web_search_urls" not in params
+
+
+def test_analysis_never_scrapes_so_search_runs_on_link_threads(venice):
+    # With scraping on, a URL in the last user message makes Venice skip web search.
+    fake = venice({Config.MODEL_UNBIASED: [_answer("ok")]})
+    venice_api.analyse("is this accurate? https://example.com/story", urls=["https://example.com/story"])
+    params = fake.payloads[0]["venice_parameters"]
+    assert params["enable_web_scraping"] is False
+    assert "web_search_urls" not in params
+    assert params["enable_web_search"] in ("on", "auto")
 
 
 def test_complex_lane_starts_on_kimi(venice):

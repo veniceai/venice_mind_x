@@ -107,7 +107,7 @@ From the X rate card and Venice's pricing page, 2026-11-10.
 | Venice: Clef route + gate | $0.05 per 1M tokens | under $0.001 | under $0.001 |
 | Venice: DeepSeek lane | $0.33 / $1.32 per 1M tokens, 1–4 calls | $0.005 | $0.02 |
 | Venice: Kimi K3 lane (math, code) | $3.75 / $18.75 per 1M tokens | $0.03–0.08 | $0.30 |
-| Venice: web search / scraping | $0.01 per search, $0.01 per URL, per call | $0.01 | $0.09 |
+| Venice: web search | $0.01 per search, per analysis call | $0.01 | $0.04 |
 
 A typical DeepSeek reply comes to about $0.03–0.04; a heavy one with four X tool
 calls to about $0.35. At the 15-replies-an-hour cap that bounds a busy day

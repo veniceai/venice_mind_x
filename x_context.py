@@ -224,7 +224,7 @@ class ThreadContext:
 
     @property
     def urls(self) -> List[str]:
-        """Non-X links from every post, for URL screening and web scraping."""
+        """Non-X links from every post, for URL screening."""
         urls = [u for p in self.all_posts() for u in p.urls if not status_id(u)]
         return list(dict.fromkeys(urls))
 
