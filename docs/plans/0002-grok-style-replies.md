@@ -260,8 +260,12 @@ switch short of removing it.
   evidence is clear (Jordan).
 - **Refusals:** hedges count only when they are the whole reply; if every model
   refuses, nothing posts.
-- **Fail-open stays** (Jordan): router and gate failures route to DeepSeek and
-  post unchecked, logged at ERROR.
+- **Fail-open, then a middle ground:** router and gate failures route to
+  DeepSeek and post unchecked, logged at ERROR (Jordan, 2026-11-11). On
+  2026-11-12 Jordan approved Sabrina's change: when Clef errors, leave the
+  mention unprocessed and retry it on the next poll (mentions stay eligible for
+  60 minutes), so a blip still gets answered and an outage posts nothing
+  unchecked. Sabrina is writing it.
 - **Charged lane:** bake-off of DeepSeek 1017 Uncensored against Grok 4.3 with
   native X search, `scripts/bakeoff_charged.py`.
 - **Sabrina's pieces, now on this branch:** scraping off (and the unused
@@ -269,6 +273,26 @@ switch short of removing it.
   length target enforced in `craft_tweet()` and `rewrite_reply()`, a `PAUSED`
   file that stops the loop without a restart, and `logs/replies.jsonl` with one
   record per handled mention.
+
+### 9. Contested topics: a sourced fact sheet (2026-11-12)
+
+Jordan wanted the COVID-origin answer to lead with lab leak. No source as of
+2026-11-12 calls it confirmed: the White House (official page since April
+2025), CIA (low confidence), FBI (moderate), DOE (low) and Germany's BND
+(80-95%) put a lab leak as most likely; WHO's SAGO (June 2025) leans zoonotic
+but calls it inconclusive because China withheld data; Axios (August 2026)
+reports no definitive answer. Jordan's call: lead with the official finding,
+by name.
+
+`contested_facts.json` holds that framing with dated sources. When a question
+matches (a phrase, or a hit in every keyword group), `analyse()` adds a
+SOURCED POSITIONS block and the positions join the gate's evidence. With the
+lead instruction putting the official finding in the first sentence and the
+caveat last, the bot opened "Most likely a lab leak: that's the US
+government's official position…" in 6 of 6 runs over two phrasings. Before
+that instruction, the open-ended "where did covid come from?" opened with "No
+definitive answer" in 3 of 3. The sheet is editorial: every entry needs
+sources and a review date, and the bot warns at startup after 120 days.
 
 ## Cost per reply (estimate)
 
