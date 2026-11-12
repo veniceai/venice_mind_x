@@ -22,7 +22,9 @@ from safety import (
     screen_input_for_injection,
     is_censored,
 )
-from venice_knowledge import relevant_faqs, get_models, summarize_models
+from venice_knowledge import (
+    format_positions, get_models, position_evidence, relevant_faqs, relevant_positions, summarize_models,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -411,6 +413,19 @@ def analyse(
             "models API — trust these over your own knowledge):\n"
             + "\n\n".join(knowledge_parts)
         )
+
+    # ── Sourced positions on contested topics (contested_facts.json) ──
+    topics = relevant_positions(full_topic_text)
+    if topics:
+        logger.info(f"📌 Sourced positions: {', '.join(t['id'] for t in topics)}")
+        msg += (
+            "\n\nSOURCED POSITIONS (reviewed by the Venice team; lead with this framing, "
+            "name who holds each position, never overstate it):\n"
+            + "\n\n".join(format_positions(t) for t in topics)
+        )
+        if evidence is not None:
+            for t in topics:
+                evidence.extend(position_evidence(t))
 
     length_rule = (
         f"LENGTH: most replies are one or two sentences. Keep the text inside [FINAL_REPLY] "

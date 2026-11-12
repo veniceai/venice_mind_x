@@ -41,6 +41,7 @@ JSON file. It is deployed as a plain `python main.py` process.
 | `x_context.py` | Builds the thread a mention gets: reply chain with authors, `note_tweet` full text, quotes, x.com links via the API, images + video thumbnails. |
 | `x_tools.py` | `XToolbox`: the model's X tools (`x_thread_fetch`, `x_keyword_search`, `x_user_lookup`, `view_image`). Never raises; screens fetched posts for injection. |
 | `safety.py` | Anti-scam URL screening, prompt-injection detection, output scanning, censorship detection. Pure functions, no I/O. |
+| `contested_facts.json` | **Editorial.** The team's sourced framing for contested topics (today: COVID-19 origin). Injected as SOURCED POSITIONS when a question matches; its positions count as evidence for the gate. Every position needs a source and a date; the bot warns at startup when an entry's review is over 120 days old. |
 | `venice_knowledge.py` | FAQ snapshot loader + keyword relevance ("crude RAG") and the live models API (6h TTL, snapshot fallback). |
 | `twitter_client.py` | Thin tweepy wrappers: `get_mentions` (user context, for Owned Read pricing), `reply_to_tweet`, `get_tweet_by_id`, search, user lookup; `fit_x_rules` (one cashtag, @mentions only of thread participants). |
 | `clients.py` | Constructs the authenticated tweepy client. |
@@ -122,6 +123,10 @@ builder and the tool loop without needing credentials.
   `_call_venice`). The bot sends `include_venice_system_prompt: false`, so
   nothing else tells the model the date, and without it the model treats its
   training cutoff as now and news it hasn't seen as fake.
+- **`contested_facts.json` decides how the bot leads on its topics.** It is an editorial
+  choice, so keep it to positions you can source and date, never state more than the
+  sources do (the COVID entry says 'most likely', not 'confirmed'), and re-run
+  `scripts/eval_replies.py --repeat 3 lab-leak covid-origin` after editing it.
 - **X self-serve posting rules** reject replies the bot wasn't summoned to,
   posts with more than one cashtag, and @mentions of people outside the
   conversation. `fit_x_rules` handles the last two; keep it on the post path.

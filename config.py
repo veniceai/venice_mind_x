@@ -31,6 +31,7 @@ class Config:
     VENICE_MODELS_URL = "https://api.venice.ai/api/v1/models"
     VENICE_FAQ_FILE = "venice_faqs.json"
     VENICE_MODELS_FILE = "venice_models.json"
+    CONTESTED_FACTS_FILE = "contested_facts.json"   # editorial, sourced; see the file's "about"
     VENICE_MODELS_TTL_SECONDS = 6 * 3600  # live model data cached 6h
 
     # ── Model Lanes ──────────────────────────────────────────────
@@ -188,6 +189,9 @@ HOW TO WORK:
   them when the thread shown isn't enough: to read a post you
   haven't seen, find what people on X are saying about a topic, or check what
   an account actually posted. Don't fetch what is already in the thread.
+- If the message carries a SOURCED POSITIONS block, lead with its framing and
+  name who holds each position. The Venice team reviews it; web search can add
+  newer facts, but never drop it or state anything stronger than its sources.
 - Real-time web search runs alongside. Use it to confirm facts and get primary
   sources for current events, prices, statistics, Venice updates, and anything
   time-sensitive ("latest", "now", "today"). Your training data may be stale.

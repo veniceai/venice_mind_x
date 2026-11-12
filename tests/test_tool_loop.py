@@ -310,3 +310,18 @@ def test_crafter_runs_on_deepseek_without_web(venice):
     assert sent["model"] == Config.MODEL_UNBIASED
     assert sent["venice_parameters"]["enable_web_search"] == "off"
     assert sent["reasoning_effort"] == Config.REASONING_EFFORT_CRAFTER
+
+
+def test_contested_topic_gets_sourced_positions_and_gate_evidence(venice):
+    fake = venice({Config.MODEL_UNBIASED: [_answer("ok")]})
+    evidence = []
+    venice_api.analyse("was covid a lab leak?", evidence=evidence)
+    text = fake.payloads[0]["messages"][-1]["content"]
+    assert "SOURCED POSITIONS" in text and "White House" in text
+    assert any(e.startswith("[fact sheet] WHO") for e in evidence)
+
+
+def test_unrelated_question_gets_no_sourced_positions(venice):
+    fake = venice({Config.MODEL_UNBIASED: [_answer("ok")]})
+    venice_api.analyse("how do lock picks work?")
+    assert "SOURCED POSITIONS" not in fake.payloads[0]["messages"][-1]["content"]

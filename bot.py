@@ -16,7 +16,7 @@ from finalize import finalize_reply
 from reply_log import log_reply
 from twitter_client import get_mentions, reply_to_tweet, TweetCache
 from venice_api import analyse, craft_tweet, get_trace
-from venice_knowledge import validate_configured_models
+from venice_knowledge import stale_fact_topics, validate_configured_models
 from x_context import build_context, question_text
 from x_tools import XToolbox
 
@@ -40,6 +40,9 @@ class VeniceBot:
             logger.warning("DRY_RUN is on — replies are logged, not posted.")
         if not Config.ROUTER_ENABLED:
             logger.error("ROUTER_ENABLED is off — every mention goes to DeepSeek and doxxing requests aren't declined.")
+        stale = stale_fact_topics()
+        if stale:
+            logger.warning(f"contested_facts.json entries due for review: {', '.join(stale)}")
         if not Config.REPLY_GATE_ENABLED:
             logger.error("REPLY_GATE_ENABLED is off — replies post without the hard-line and fact checks.")
 
