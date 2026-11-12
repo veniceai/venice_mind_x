@@ -54,6 +54,9 @@ python test_local.py --offline-only
 # Test a specific tweet (asks before posting; --dry just prints)
 python reply_to_tweet.py https://x.com/user/status/1234567890 --dry
 
+# Local test page: build a thread, tag the bot, see the reply and how it was made (posts nothing)
+.venv/bin/python scripts/playground.py        # http://localhost:3000
+
 # Sample threads through the live Venice pipeline, X faked (no X keys, posts nothing)
 python scripts/eval_replies.py
 

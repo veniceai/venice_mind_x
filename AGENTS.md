@@ -49,6 +49,7 @@ JSON file. It is deployed as a plain `python main.py` process.
 | `state.py` | `State`: persisted set of processed tweet IDs + per-conversation author locks. |
 | `utils.py` | URL extraction helpers. |
 | `scripts/fetch_venice_data.py` | Refreshes `venice_faqs.json` + `venice_models.json` snapshots. Run manually or via cron. |
+| `scripts/playground.py` | Local test page on `127.0.0.1:3000`: write a thread (or paste a real post link, read-only), get the reply with its route, Venice calls, cost, sources and gate result. Never posts. |
 | `scripts/eval_replies.py` | Live probe: sample threads through the real Venice pipeline with X faked. |
 | `reply_to_tweet.py`, `mock_test.py`, `test_local.py` | Manual / offline test harnesses (see below). |
 
