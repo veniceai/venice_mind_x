@@ -112,6 +112,10 @@ builder and the tool loop without needing credentials.
   don't turn it back on. Venice also drops unknown `venice_parameters` keys
   without an error (the old `web_search_urls` never did anything), so check the
   docs before adding one.
+- **Every Venice call states today's date** (`_date_context()` in
+  `_call_venice`). The bot sends `include_venice_system_prompt: false`, so
+  nothing else tells the model the date, and without it the model treats its
+  training cutoff as now and news it hasn't seen as fake.
 - **X self-serve posting rules** reject replies the bot wasn't summoned to,
   posts with more than one cashtag, and @mentions of people outside the
   conversation. `fit_x_rules` handles the last two; keep it on the post path.

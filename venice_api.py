@@ -9,6 +9,7 @@ import base64
 import re
 import logging
 import requests
+from datetime import datetime, timezone
 from typing import Optional, List
 from config import Config
 from router import COMPLEX, route
@@ -76,6 +77,16 @@ _TOOL_MARKUP_RE = re.compile(
 
 _IMAGES_INTRO = {"type": "text", "text": "Images from the X thread (listed in the next message):"}
 _XAI_NATIVE_TOOL_NAMES = {"x_keyword_search", "x_semantic_search", "x_user_search", "x_thread_fetch"}
+
+
+def _date_context() -> str:
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    return (
+        f"Today's date is {today} (UTC). Your training data ends before today, so real "
+        "events have happened that you don't know about. If the thread or your sources "
+        "report something new to you, don't call it false or fabricated unless you have "
+        "evidence against it."
+    )
 
 
 def _clean_content(text: str) -> str:
@@ -237,7 +248,7 @@ def _call_venice(
     Venice skips web search when the last user message holds an image, so
     `image_parts` go in their own user message ahead of the text.
     """
-    messages = [{"role": "system", "content": system}]
+    messages = [{"role": "system", "content": f"{system}\n\n{_date_context()}"}]
     if image_parts:
         messages.append({"role": "user", "content": [_IMAGES_INTRO] + image_parts})
     messages.append({"role": "user", "content": user_content})

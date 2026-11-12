@@ -1,5 +1,6 @@
 """Plan 0002 — the Venice tool loop and the lane cascade (offline; Venice is stubbed)."""
 import json
+from datetime import datetime, timezone
 from types import SimpleNamespace
 
 import pytest
@@ -141,6 +142,16 @@ def test_grok_gets_native_x_search_without_colliding_tool_names(venice, monkeypa
     sent = fake.payloads[0]
     assert sent["venice_parameters"]["enable_x_search"] is True
     assert [t["function"]["name"] for t in sent["tools"]] == ["x_user_lookup", "view_image"]
+
+
+def test_every_call_states_todays_date(venice):
+    # Without it the model treats its training cutoff as now, and news it hasn't seen as fake.
+    fake = venice({Config.MODEL_UNBIASED: [_answer("ok")]})
+    venice_api._call_venice(Config.MODEL_UNBIASED, "sys", "q")
+    system = fake.payloads[0]["messages"][0]["content"]
+    assert system.startswith("sys\n\n")
+    assert datetime.now(timezone.utc).strftime("%Y-%m-%d") in system
+    assert "fabricated" in system
 
 
 def test_no_toolbox_means_no_tools(venice):
