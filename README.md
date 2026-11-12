@@ -59,6 +59,9 @@ python scripts/eval_replies.py
 
 # Run the live bot without posting: replies go to the log
 DRY_RUN=true python main.py
+
+# Pause the running bot without a restart (delete the file to resume)
+touch PAUSED
 ```
 
 ## Refreshing Venice knowledge

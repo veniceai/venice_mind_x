@@ -94,6 +94,11 @@ is told those tools are unavailable.
 | `REPLY_GATE_ENABLED` | true | false: skip the hard-line check on the final reply |
 | `X_PREMIUM_ENABLED` | false | true: 550-character replies |
 
+To pause the bot without a restart, create a file named `PAUSED` in its
+working directory (`touch PAUSED`). It stops reading mentions on its next loop,
+within a few minutes, and resumes when the file is deleted. Mentions older than
+60 minutes by then are skipped.
+
 ## 4. What a reply costs
 
 From the X rate card and Venice's pricing page, 2026-11-10.

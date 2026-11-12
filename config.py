@@ -147,6 +147,9 @@ class Config:
     # ── Behaviour Flags ──────────────────────────────────────────
     # Log the reply that would be posted instead of posting it.
     DRY_RUN = os.getenv("DRY_RUN", "false").lower() == "true"
+    # Creating this file in the working directory pauses the bot on its next
+    # loop, without a restart; deleting it resumes.
+    PAUSE_FILE = "PAUSED"
     USE_SESSION_START_CUTOFF = True
     STATE_FILE = "state.json"
     # State is bounded: mentions only arrive from the recent lookback window, so

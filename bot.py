@@ -2,8 +2,10 @@
 Core bot logic — polls mentions, processes them through the Venice AI pipeline.
 """
 import logging
+import os
 import time
 from datetime import datetime, timezone, timedelta
+from typing import Optional
 
 import tweepy
 
@@ -18,6 +20,11 @@ from x_context import build_context, question_text
 from x_tools import XToolbox
 
 logger = logging.getLogger(__name__)
+
+
+def is_paused(pause_file: Optional[str] = None) -> bool:
+    """True while the pause file exists; the main loop checks it every pass."""
+    return os.path.exists(pause_file or Config.PAUSE_FILE)
 
 
 class VeniceBot:
@@ -311,8 +318,18 @@ class VeniceBot:
 
     def run(self):
         logger.info("Venice X Bot is live. 🚀")
+        paused = False
         while True:
             try:
+                if is_paused():
+                    if not paused:
+                        logger.warning(f"Paused: {Config.PAUSE_FILE} file present; not reading mentions")
+                        paused = True
+                    time.sleep(Config.CHECK_INTERVAL)
+                    continue
+                if paused:
+                    logger.info(f"Resumed: {Config.PAUSE_FILE} file removed")
+                    paused = False
                 self.process_mentions()
                 self.state.save()
             except KeyboardInterrupt:

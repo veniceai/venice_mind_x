@@ -31,7 +31,7 @@ JSON file. It is deployed as a plain `python main.py` process.
 | File | Responsibility |
 |---|---|
 | `main.py` | Entry point. Configures logging, validates config, runs `VeniceBot`. |
-| `bot.py` | Core loop: poll mentions → filter → gather thread context → generate → reply. Rate limiting, anti-spam, backoff, `DRY_RUN`. |
+| `bot.py` | Core loop: poll mentions → filter → gather thread context → generate → reply. Rate limiting, anti-spam, backoff, `DRY_RUN`, and the `PAUSED` file check on every loop. |
 | `config.py` | **Single source of truth** for settings, model IDs, and the two system prompts (`ANALYST_PROMPT`, `CRAFTER_PROMPT`). |
 | `router.py` | One Clef call (`POST /decisions`, four yes/no questions) per mention → uncensored lane (DeepSeek) or complex lane (Kimi K3), or a decline for doxxing requests. `choose_lane` is pure. |
 | `reply_gate.py` | Clef check of the final reply, with the thread and evidence (web citations, fetched posts): the four hard lines, unsupported claims about real people or recent events, private-person speculation, VVV/DIEM returns. Fails open, logs ERROR. |
