@@ -122,3 +122,27 @@ merged via PR).
 - Plans and the reasoning behind larger changes go in `docs/` (see
   `docs/plans/`). Write the plan before the big change.
 - Don't commit secrets (`.env`) or runtime churn (`state.json`).
+
+### Scope and review
+
+Changes here get approved by people with different jobs (engineering, safety,
+brand), so each PR should need only one kind of approval.
+
+- **One change per PR.** You should be able to describe it in one sentence. If
+  the description needs headers for unrelated parts, split it.
+- **Keep it small:** under about 400 lines of code changes. Tests don't count,
+  and neither do data snapshots. Snapshot refreshes (`venice_models.json`,
+  `venice_faqs.json`) go in their own PR.
+- **Editorial and brand changes stand alone:** the persona and voice in the
+  system prompts, sourced positions on contested topics (such as
+  `contested_facts.json`), or anything else that sets what the bot publicly
+  says about a subject. The PR names who signed off (brand or marketing).
+- **Safety behavior needs the bot owner's approval before the code is
+  written:** the router, the reply gate, `finalize.py`, `safety.py`, which
+  models a lane may use, and what happens when a check or a model fails. Open
+  an issue or ask first.
+- **Short descriptions:** what changes and why in a few lines, how you verified
+  it (tests, eval, dry run), and any decision the reviewer has to make. Put long
+  transcripts in a collapsed `<details>` block.
+- **Branch from `main`.** Stack on another PR only when yours truly depends on
+  it, and say so at the top of the description.
