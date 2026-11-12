@@ -4,7 +4,8 @@ Clef (Cloudflare's decision model, private) sits behind Venice's POST /decisions
 it reads a state and answers typed questions with probabilities instead of
 generating text. The bot asks four yes/no questions about each mention: three
 pick the lane (`choose_lane`), the fourth flags requests to dox someone, which
-get a one-line decline. Any failure routes to the uncensored lane.
+get a one-line decline. If Clef can't answer, `route()` raises ClefUnavailable
+and the bot leaves the mention for its next poll instead of answering unrouted.
 """
 import logging
 from dataclasses import dataclass
@@ -15,6 +16,12 @@ import requests
 from config import Config
 
 logger = logging.getLogger(__name__)
+
+
+class ClefUnavailable(Exception):
+    """Clef (POST /decisions) couldn't answer, so the mention can't be routed or
+    its reply checked. Nothing should post; the bot retries on its next poll."""
+
 
 UNBIASED = "unbiased"
 COMPLEX = "complex"
@@ -121,8 +128,8 @@ def route(query: str, context: Optional[str] = None, has_image: bool = False) ->
         complex_ = float(answers["complex"]["noul"])
         private_info = float(answers["private_info"]["noul"])
     except Exception as e:
-        logger.error(f"Router ({Config.MODEL_ROUTER}) failed ({e}); using the uncensored lane, no doxxing check")
-        return Route(UNBIASED, reason=f"router error: {e}")
+        logger.error(f"Router ({Config.MODEL_ROUTER}) failed ({e}); leaving the mention for the next poll")
+        raise ClefUnavailable(f"router: {e}") from e
 
     r = Route(choose_lane(charged, filtered, complex_), charged, filtered, complex_, private_info)
     logger.info(

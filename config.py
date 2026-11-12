@@ -66,6 +66,9 @@ class Config:
     ROUTER_PRIVATE_INFO_THRESHOLD = 0.5  # at or above → decline; no model or X lookups run
     DECLINE_PRIVATE_INFO = "Not digging up or posting anyone's personal details."
     ROUTER_STATE_MAX_CHARS = 12_000  # Clef reads up to 32,768 tokens in total
+    # When Clef errors, the mention waits for the next poll (about every 3
+    # minutes); after this many tries the bot gives up on it without replying.
+    CLEF_MAX_ATTEMPTS = 10
     # Final-reply check against the prompt's HARD LINES (reply_gate.py).
     REPLY_GATE_ENABLED = os.getenv("REPLY_GATE_ENABLED", "true").lower() == "true"
     REPLY_GATE_THRESHOLD = 0.5

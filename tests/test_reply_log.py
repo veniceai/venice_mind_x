@@ -123,6 +123,7 @@ def _process_one_mention():
     instance.client = None
     instance.hourly_replies = 0
     instance.user_reply_counts = {}
+    instance.clef_attempts = {}
     mention = SimpleNamespace(id=1, author_id=2, conversation_id=1, created_at=datetime.now(timezone.utc))
     instance._process_tweet(mention, includes={}, user_lookup={2: AUTHOR})
 

@@ -34,8 +34,8 @@ JSON file. It is deployed as a plain `python main.py` process.
 | `bot.py` | Core loop: poll mentions → filter → gather thread context → generate → reply. Rate limiting, anti-spam, backoff, `DRY_RUN`, the `PAUSED` file check on every loop, and one reply-log record per handled mention. |
 | `reply_log.py` | `log_reply()`: appends a JSON line to `logs/replies.jsonl` (route, models, cost, gate result, reply, posted). Never raises. The trace it logs comes from `venice_api.get_trace()`. |
 | `config.py` | **Single source of truth** for settings, model IDs, and the two system prompts (`ANALYST_PROMPT`, `CRAFTER_PROMPT`). |
-| `router.py` | One Clef call (`POST /decisions`, four yes/no questions) per mention → uncensored lane (DeepSeek) or complex lane (Kimi K3), or a decline for doxxing requests. `choose_lane` is pure. |
-| `reply_gate.py` | Clef check of the final reply, with the thread and evidence (web citations, fetched posts): the four hard lines, unsupported claims about real people or recent events, speculation or insinuation about anyone's health, private life or alleged wrongdoing (public figures included), VVV/DIEM returns. Fails open, logs ERROR. |
+| `router.py` | One Clef call (`POST /decisions`, four yes/no questions) per mention → uncensored lane (DeepSeek) or complex lane (Kimi K3), or a decline for doxxing requests. `choose_lane` is pure. Raises `ClefUnavailable` when Clef can't answer; the bot then holds the mention for the next poll (up to `CLEF_MAX_ATTEMPTS`). |
+| `reply_gate.py` | Clef check of the final reply, with the thread and evidence (web citations, fetched posts): the four hard lines, unsupported claims about real people or recent events, speculation or insinuation about anyone's health, private life or alleged wrongdoing (public figures included), VVV/DIEM returns. Raises `ClefUnavailable` (logged at ERROR) when Clef can't answer, so nothing posts unchecked. |
 | `finalize.py` | `finalize_reply()`: `fit_x_rules`, the `mentions_token_returns` regex backstop, the gate; one rewrite for an unsupported claim or a token-return figure, otherwise not posted. |
 | `venice_api.py` | Venice chat-completion calls. The two-pass `analyse()` + `craft_tweet()` pipeline, the function-calling tool loop, and the per-lane model cascade. |
 | `x_context.py` | Builds the thread a mention gets: reply chain with authors, `note_tweet` full text, quotes, x.com links via the API, images + video thumbnails. |
@@ -105,7 +105,9 @@ builder and the tool loop without needing credentials.
 - **The uncensored model is abliterated.** It barely refuses, so the prompt's
   HARD LINES are backed in code: the router declines doxxing requests before
   any model runs, and `reply_gate.py` checks every final reply. Don't remove
-  either without replacing it. `is_censored()` drives fallbacks: direct refusals
+  either without replacing it, and don't catch `ClefUnavailable` anywhere but
+  `bot.py`: when Clef is down the mention must wait, never post unrouted or
+  unchecked. `is_censored()` drives fallbacks: direct refusals
   count anywhere, hedges only when they are the whole reply; if every model
   refuses, nothing posts.
 - **Venice skips web search** when the last user message holds an image or when

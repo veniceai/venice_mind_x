@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from clients import get_twitter_client
 from finalize import finalize_reply
-from router import route
+from router import ClefUnavailable, route
 from twitter_client import get_tweet_by_id, reply_to_tweet, TweetCache
 from venice_api import analyse, craft_tweet
 from safety import classify_url
@@ -60,23 +60,27 @@ def main():
     for u in ctx.urls:
         print(f"   {classify_url(u):>10} │ {u}")
 
-    r = route(query, ctx.render(), bool(ctx.images))
-    print(f"🧭 Lane: {r.lane} (charged={r.charged}, filtered={r.filtered}, complex={r.complex}) {r.reason}")
+    try:
+        r = route(query, ctx.render(), bool(ctx.images))
+        print(f"🧭 Lane: {r.lane} (charged={r.charged}, filtered={r.filtered}, complex={r.complex}) {r.reason}")
 
-    toolbox = XToolbox(client, cache, bot_id=me.id)
-    evidence: list = []
-    print("🤖 Analysing …")
-    analysis = analyse(query, context=ctx.render(), images=ctx.images, urls=ctx.urls,
-                       toolbox=toolbox, evidence=evidence)
-    print("✍️ Crafting tweet …")
-    drafted = craft_tweet(
-        analysis, use_vision=bool(ctx.images),
-        context_urls=ctx.urls + ctx.permalinks + toolbox.permalinks,
-    )
-    final, line = finalize_reply(
-        drafted, thread=ctx.render(), sources="\n".join(evidence + toolbox.evidence),
-        participants=ctx.participants(),
-    )
+        toolbox = XToolbox(client, cache, bot_id=me.id)
+        evidence: list = []
+        print("🤖 Analysing …")
+        analysis = analyse(query, context=ctx.render(), images=ctx.images, urls=ctx.urls,
+                           toolbox=toolbox, evidence=evidence)
+        print("✍️ Crafting tweet …")
+        drafted = craft_tweet(
+            analysis, use_vision=bool(ctx.images),
+            context_urls=ctx.urls + ctx.permalinks + toolbox.permalinks,
+        )
+        final, line = finalize_reply(
+            drafted, thread=ctx.render(), sources="\n".join(evidence + toolbox.evidence),
+            participants=ctx.participants(),
+        )
+    except ClefUnavailable as e:
+        print(f"⚠️ Clef is unavailable ({e}); the bot would hold this mention and retry on its next poll.")
+        sys.exit(1)
     if line:
         print(f"⛔ The reply fails the {line} check; the bot would not post it. Draft:\n{drafted}")
         final = drafted

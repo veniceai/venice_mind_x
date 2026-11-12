@@ -6,8 +6,8 @@ line, states something about a real person or recent event that the thread
 and sources don't support, speculates about anyone's health, private life or
 alleged wrongdoing, or quotes
 returns for Venice's tokens. It is deliberately narrow (everything else posts
-as written) and fails open: if the check itself errors, the reply posts and
-the error is logged at ERROR.
+as written). If the check itself errors it raises ClefUnavailable, so nothing
+posts unchecked; the bot retries the mention on its next poll.
 """
 import logging
 from typing import Optional
@@ -15,6 +15,7 @@ from typing import Optional
 import requests
 
 from config import Config
+from router import ClefUnavailable
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +72,7 @@ QUESTIONS = {
 
 
 def crossed_line(reply: str, thread: str = "", sources: str = "") -> Optional[str]:
-    """The first check `reply` fails, or None. Fails open."""
+    """The first check `reply` fails, or None. Raises ClefUnavailable if Clef can't answer."""
     if not Config.REPLY_GATE_ENABLED or not reply:
         return None
     state = {
@@ -93,8 +94,8 @@ def crossed_line(reply: str, thread: str = "", sources: str = "") -> Optional[st
         answers = r.json()["answers"]
         scores = {k: float(answers[k]["noul"]) for k in QUESTIONS}
     except Exception as e:
-        logger.error(f"Reply gate failed ({e}); posting without it")
-        return None
+        logger.error(f"Reply gate failed ({e}); holding the reply for the next poll")
+        raise ClefUnavailable(f"gate: {e}") from e
     hits = [k for k, p in scores.items() if p >= Config.REPLY_GATE_THRESHOLD]
     if hits:
         logger.warning(f"⛔ Reply fails the gate ({', '.join(hits)}): {scores}")

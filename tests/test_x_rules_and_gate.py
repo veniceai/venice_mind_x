@@ -75,9 +75,11 @@ def test_gate_blocks_a_crossed_line(monkeypatch):
     assert reply_gate.crossed_line("He lives at 12 Elm St, 555-0100") == "private_info"
 
 
-def test_gate_fails_open(monkeypatch):
+def test_gate_raises_clef_unavailable_when_it_cannot_run(monkeypatch):
+    from router import ClefUnavailable
     monkeypatch.setattr(reply_gate.requests, "post", _gate_post(exc=requests.exceptions.Timeout("slow")))
-    assert reply_gate.crossed_line("anything") is None
+    with pytest.raises(ClefUnavailable, match="gate"):
+        reply_gate.crossed_line("anything")
 
 
 def test_gate_can_be_turned_off(monkeypatch):

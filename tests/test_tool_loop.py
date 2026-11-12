@@ -276,6 +276,19 @@ def test_injection_is_blocked_before_any_model_call(venice):
     assert fake.payloads == []
 
 
+def test_a_clef_outage_stops_analysis_before_any_model_call(venice, monkeypatch):
+    from router import ClefUnavailable
+    fake = venice({Config.MODEL_UNBIASED: [_answer("[FINAL_REPLY]unrouted[/FINAL_REPLY]")]})
+
+    def down(*a, **k):
+        raise ClefUnavailable("router: timeout")
+
+    monkeypatch.setattr(venice_api, "route", down)
+    with pytest.raises(ClefUnavailable):
+        venice_api.analyse("is this true?", toolbox=FakeToolbox())
+    assert fake.payloads == []
+
+
 def test_dox_request_declines_without_calling_a_model(venice, monkeypatch):
     fake = venice({})
     monkeypatch.setattr(venice_api, "route", lambda *a, **k: Route(UNBIASED, private_info=0.97))

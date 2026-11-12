@@ -74,11 +74,11 @@ def test_route_sends_four_questions_to_clef(monkeypatch):
         _fake_post({"charged": {"type": "noul", "noul": 0.1}}),   # malformed answer
     ],
 )
-def test_route_falls_back_to_uncensored_lane_on_any_failure(monkeypatch, post):
+def test_route_raises_clef_unavailable_on_any_failure(monkeypatch, post):
+    # An unrouted mention skips the doxxing decline, so it waits for the next poll instead.
     monkeypatch.setattr(router.requests, "post", post)
-    r = router.route("anything")
-    assert r.lane == UNBIASED
-    assert r.reason.startswith("router error")
+    with pytest.raises(router.ClefUnavailable, match="router"):
+        router.route("anything")
 
 
 def test_route_disabled_skips_the_call(monkeypatch):

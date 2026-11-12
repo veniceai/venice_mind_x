@@ -224,7 +224,8 @@ threats or calls for violence, and instructions for mass-casualty weapons.
   model or X lookup runs (in the eval the model otherwise made 4–7 lookups
   hunting for the person and offered to keep digging).
 - `reply_gate.py` asks Clef whether the final reply crosses any of the four;
-  if so, nothing posts. It fails open. On eleven sample replies (drug doses,
+  if so, nothing posts. (It first failed open; see section 8 for the retry
+  that replaced that.) On eleven sample replies (drug doses,
   harm reduction, dark jokes, lock picking, SIM swapping, a public figure's
   city) it flagged only the doxxing one.
 - `twitter_client.fit_x_rules` enforces X's self-serve limits on the way out:
@@ -253,7 +254,7 @@ switch short of removing it.
   and none of the six good ones. `finalize.py` gives an unsupported claim or a
   token-return figure one rewrite and a recheck; everything else is dropped.
   A regex backstop catches yield/APR/APY/ROI or percentages near VVV, sVVV or
-  DIEM, since the gate fails open.
+  DIEM without calling Clef at all.
 - **Prompt:** Unverified is a verdict; media framing gets the same skepticism
   as any source, but reporting is never called false without evidence; claims
   about real people only as far as sources go. Clear verdicts stay where the
@@ -265,7 +266,11 @@ switch short of removing it.
   2026-11-12 Jordan approved Sabrina's change: when Clef errors, leave the
   mention unprocessed and retry it on the next poll (mentions stay eligible for
   60 minutes), so a blip still gets answered and an outage posts nothing
-  unchecked. Sabrina is writing it.
+  unchecked. Done: `route()` and the gate raise `ClefUnavailable`, `bot.py`
+  holds the mention, and after `CLEF_MAX_ATTEMPTS` (10) tries, about 30
+  minutes, it drops the mention without replying. A router failure stops
+  before any model call; a gate failure costs one analysis per try, which the
+  cap bounds.
 - **Charged lane:** bake-off of DeepSeek 1017 Uncensored against Grok 4.3 with
   native X search, `scripts/bakeoff_charged.py`.
 - **Sabrina's pieces, now on this branch:** scraping off (and the unused

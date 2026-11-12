@@ -14,7 +14,11 @@ logger = logging.getLogger(__name__)
 def finalize_reply(
     text: str, *, thread: str = "", sources: str = "", participants: Iterable[str] = ()
 ) -> Tuple[Optional[str], Optional[str]]:
-    """Returns (reply to post, None) or (None, the check it failed)."""
+    """Returns (reply to post, None) or (None, the check it failed).
+
+    Raises router.ClefUnavailable when the gate can't run, so the caller can
+    hold the mention instead of posting it unchecked.
+    """
     participants = list(participants)
     for attempt in range(2):
         text = fit_x_rules(text, participants)

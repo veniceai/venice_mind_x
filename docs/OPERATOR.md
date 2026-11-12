@@ -134,12 +134,13 @@ near $10–15, with a worst-case ceiling around $125. Set both spending limits.
 |---|---|
 | `CRITICAL … not in Venice's available model list` | A model ID was renamed or retired; fix `config.py` |
 | `Venice API error … HTTP 402` | Venice credits are out |
-| `Router (clef-api) failed` | Every mention falls back to DeepSeek until it recovers |
+| `Clef unavailable … retrying … on the next poll` | Clef errored; the mention waits for the next poll (about 3 minutes) |
+| `Clef still unavailable … not replying` | The mention was tried `CLEF_MAX_ATTEMPTS` (10) times, about 30 minutes, and dropped without a reply |
 | `not available on the X API plan` | The X plan rejects search or user lookup |
 | `403 on reply` | Read-only tokens, or a reply X's summon rule rejected |
 | `Not posting: the reply fails the … check` / `Declining a request for someone's private details` | The gate or the router stopped a reply |
 | `contested_facts.json entries due for review` | A fact-sheet entry's review is over 120 days old; re-check its sources and update `reviewed` |
-| `Reply gate failed` / `Router (clef-api) failed` (ERROR) | Clef is down: replies post unchecked and doxxing requests aren't declined until it recovers |
+| `Reply gate failed` / `Router (clef-api) failed` (ERROR) | Clef is down: nothing posts until it recovers; mentions are held and retried |
 | `REPLY_GATE_ENABLED is off` / `ROUTER_ENABLED is off` (ERROR at startup) | A safety switch is off |
 | `Paused: PAUSED file present` | Someone paused the bot; delete the file to resume |
 

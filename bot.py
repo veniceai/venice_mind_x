@@ -14,6 +14,7 @@ from state import State
 from clients import get_twitter_client
 from finalize import finalize_reply
 from reply_log import log_reply
+from router import ClefUnavailable
 from twitter_client import get_mentions, reply_to_tweet, TweetCache
 from venice_api import analyse, craft_tweet, get_trace
 from venice_knowledge import stale_fact_topics, validate_configured_models
@@ -63,6 +64,9 @@ class VeniceBot:
         # Per-user reply tracking (anti-spam)
         self.user_reply_counts: dict[str, int] = {}  # user_id → reply count this hour
         self.user_reply_reset = time.time()
+
+        # Mentions held back because Clef was down: tweet_id → tries so far
+        self.clef_attempts: dict[str, int] = {}
         
         logger.info("Bot ready.")
 
@@ -179,6 +183,21 @@ class VeniceBot:
 
         return log
 
+    def _hold_for_clef(self, tweet, log, error: ClefUnavailable):
+        """Leave the mention unprocessed so the next poll retries it, up to CLEF_MAX_ATTEMPTS."""
+        tid = str(tweet.id)
+        attempts = self.clef_attempts.get(tid, 0) + 1
+        if attempts >= Config.CLEF_MAX_ATTEMPTS:
+            logger.error(f"Clef still unavailable for {tid} after {attempts} tries; not replying ({error})")
+            log(skipped="clef_unavailable", attempts=attempts, gave_up=True, error=str(error))
+            self.clef_attempts.pop(tid, None)
+            self.state.add_tweet(tweet.id)
+            return
+        self.clef_attempts[tid] = attempts
+        logger.warning(f"Clef unavailable ({error}); retrying {tid} on the next poll "
+                       f"({attempts}/{Config.CLEF_MAX_ATTEMPTS})")
+        log(skipped="clef_unavailable", attempts=attempts, error=str(error))
+
     # ── Processing ───────────────────────────────────────────────
 
     def _process_tweet(self, tweet, includes: dict, user_lookup: dict):
@@ -228,14 +247,18 @@ class VeniceBot:
         evidence: list = []
         question = question_text(ctx, self.bot_username)
         log = self._reply_logger(tweet, author, question, toolbox, evidence)
-        analysis = analyse(
-            question,
-            context=ctx.render(),
-            images=ctx.images,
-            urls=ctx.urls,
-            toolbox=toolbox,
-            evidence=evidence,
-        )
+        try:
+            analysis = analyse(
+                question,
+                context=ctx.render(),
+                images=ctx.images,
+                urls=ctx.urls,
+                toolbox=toolbox,
+                evidence=evidence,
+            )
+        except ClefUnavailable as e:
+            self._hold_for_clef(tweet, log, e)
+            return
         if analysis == Config.ERROR_MESSAGE:
             logger.warning(f"Analysis failed for tweet {tweet.id}")
             log(skipped="analysis_failed")
@@ -248,10 +271,15 @@ class VeniceBot:
             log(skipped="crafting_failed")
             return
         draft = final
-        final, failed = finalize_reply(
-            draft, thread=ctx.render(), sources="\n".join(evidence + toolbox.evidence),
-            participants=ctx.participants(),
-        )
+        try:
+            final, failed = finalize_reply(
+                draft, thread=ctx.render(), sources="\n".join(evidence + toolbox.evidence),
+                participants=ctx.participants(),
+            )
+        except ClefUnavailable as e:
+            self._hold_for_clef(tweet, log, e)
+            return
+        self.clef_attempts.pop(str(tweet.id), None)
         if not final:
             logger.warning(f"Not replying to {tweet.id}: the reply fails the {failed} check")
             log(draft=draft, skipped=f"failed_{failed}_check")

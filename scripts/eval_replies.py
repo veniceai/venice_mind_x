@@ -24,6 +24,7 @@ sys.path[:0] = [ROOT, os.path.join(ROOT, "tests")]
 from config import Config  # noqa: E402
 import venice_api  # noqa: E402
 from finalize import finalize_reply  # noqa: E402
+from router import ClefUnavailable  # noqa: E402
 from safety import mentions_token_returns  # noqa: E402
 from venice_api import analyse, craft_tweet  # noqa: E402
 from x_context import build_context, question_text  # noqa: E402
@@ -310,13 +311,17 @@ def run(sc, image_path):
         evidence = []
         query = question_text(ctx, BOT.username)
         t = time.time()
-        analysis = analyse(query, context=ctx.render(), images=ctx.images, urls=ctx.urls,
-                           toolbox=box, evidence=evidence)
-        drafted = craft_tweet(analysis, use_vision=bool(ctx.images),
-                              context_urls=ctx.urls + ctx.permalinks + box.permalinks)
-        final, failed = finalize_reply(drafted, thread=ctx.render(),
-                                       sources="\n".join(evidence + box.evidence),
-                                       participants=ctx.participants())
+        drafted = final = None
+        try:
+            analysis = analyse(query, context=ctx.render(), images=ctx.images, urls=ctx.urls,
+                               toolbox=box, evidence=evidence)
+            drafted = craft_tweet(analysis, use_vision=bool(ctx.images),
+                                  context_urls=ctx.urls + ctx.permalinks + box.permalinks)
+            final, failed = finalize_reply(drafted, thread=ctx.render(),
+                                           sources="\n".join(evidence + box.evidence),
+                                           participants=ctx.participants())
+        except ClefUnavailable as e:
+            failed = f"clef_unavailable ({e})"
     finally:
         venice_api.route = real_route
     r = routes[-1] if routes else None
