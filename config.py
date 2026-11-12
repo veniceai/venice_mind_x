@@ -150,6 +150,8 @@ class Config:
     # Creating this file in the working directory pauses the bot on its next
     # loop, without a restart; deleting it resumes.
     PAUSE_FILE = "PAUSED"
+    # One JSON line per handled mention: route, models, cost, gate result, reply.
+    REPLY_LOG_FILE = os.path.join("logs", "replies.jsonl")
     USE_SESSION_START_CUTOFF = True
     STATE_FILE = "state.json"
     # State is bounded: mentions only arrive from the recent lookback window, so

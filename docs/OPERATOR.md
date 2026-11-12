@@ -140,3 +140,24 @@ near $10–15, with a worst-case ceiling around $125. Set both spending limits.
 | `Not posting: the reply fails the … check` / `Declining a request for someone's private details` | The gate or the router stopped a reply |
 | `Reply gate failed` / `Router (clef-api) failed` (ERROR) | Clef is down: replies post unchecked and doxxing requests aren't declined until it recovers |
 | `REPLY_GATE_ENABLED is off` / `ROUTER_ENABLED is off` (ERROR at startup) | A safety switch is off |
+| `Paused: PAUSED file present` | Someone paused the bot; delete the file to resume |
+
+### Reply log
+
+Every mention the bot handles gets one JSON line in `logs/replies.jsonl`, in
+the working directory: the question, the route and its Clef scores, each Venice
+call with its model, web citation count and cost, the X tool calls, the reply
+and its length, and whether it posted (with the reply's post id). A reply that
+didn't post says why: `analysis_failed`, `crafting_failed`,
+`failed_<check>_check` (with the draft the gate stopped), `post_failed` or
+`rate_limited`. The file isn't rotated; at the 15-an-hour cap it grows by under
+1 MB a day.
+
+### If it posts something bad
+
+1. `touch PAUSED` in the bot's working directory; it stops on its next loop.
+2. Delete the post from the account.
+3. Find the post in `logs/replies.jsonl` to see the route, the models, how many
+   sources it had and what the gate said.
+4. Add the thread to `scripts/eval_replies.py`, fix the cause, confirm the eval
+   passes, then delete `PAUSED`.

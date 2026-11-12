@@ -13,8 +13,9 @@ from config import Config
 from state import State
 from clients import get_twitter_client
 from finalize import finalize_reply
+from reply_log import log_reply
 from twitter_client import get_mentions, reply_to_tweet, TweetCache
-from venice_api import analyse, craft_tweet
+from venice_api import analyse, craft_tweet, get_trace
 from venice_knowledge import validate_configured_models
 from x_context import build_context, question_text
 from x_tools import XToolbox
@@ -147,6 +148,34 @@ class VeniceBot:
             return False
         return True
 
+    @staticmethod
+    def _reply_logger(tweet, author, question: str, toolbox, evidence: list):
+        """A callable that appends this mention's outcome to the reply log."""
+        base = {
+            "tweet_id": str(tweet.id),
+            "conversation_id": str(getattr(tweet, "conversation_id", "") or ""),
+            "author": getattr(author, "username", None),
+            "dry_run": Config.DRY_RUN,
+            "question": question,
+        }
+
+        def log(**outcome):
+            trace = get_trace()
+            reply = outcome.get("reply")
+            log_reply({
+                **base,
+                "route": trace["route"],
+                "calls": trace["calls"],
+                "tool_calls": toolbox.calls,
+                "posts_fetched": toolbox.posts_fetched,
+                "sources": len(evidence) + len(toolbox.evidence),
+                **({"chars": len(reply)} if reply else {}),
+                "posted": False,
+                **outcome,
+            })
+
+        return log
+
     # ── Processing ───────────────────────────────────────────────
 
     def _process_tweet(self, tweet, includes: dict, user_lookup: dict):
@@ -194,8 +223,10 @@ class VeniceBot:
 
         # ── Generate reply ──
         evidence: list = []
+        question = question_text(ctx, self.bot_username)
+        log = self._reply_logger(tweet, author, question, toolbox, evidence)
         analysis = analyse(
-            question_text(ctx, self.bot_username),
+            question,
             context=ctx.render(),
             images=ctx.images,
             urls=ctx.urls,
@@ -204,25 +235,30 @@ class VeniceBot:
         )
         if analysis == Config.ERROR_MESSAGE:
             logger.warning(f"Analysis failed for tweet {tweet.id}")
+            log(skipped="analysis_failed")
             return
 
         allowed_links = ctx.urls + ctx.permalinks + toolbox.permalinks
         final = craft_tweet(analysis, use_vision=bool(ctx.images), context_urls=allowed_links)
         if not final or final == Config.ERROR_MESSAGE:
             logger.warning(f"Crafting failed for tweet {tweet.id}")
+            log(skipped="crafting_failed")
             return
+        draft = final
         final, failed = finalize_reply(
-            final, thread=ctx.render(), sources="\n".join(evidence + toolbox.evidence),
+            draft, thread=ctx.render(), sources="\n".join(evidence + toolbox.evidence),
             participants=ctx.participants(),
         )
         if not final:
             logger.warning(f"Not replying to {tweet.id}: the reply fails the {failed} check")
+            log(draft=draft, skipped=f"failed_{failed}_check")
             self.state.add_tweet(tweet.id)
             return
 
         if Config.DRY_RUN:
             logger.info(f"[DRY_RUN] Would reply to {tweet.id} ({len(final)} chars, "
                         f"{toolbox.posts_fetched} post(s) fetched by tools):\n{final}")
+            log(reply=final)
             self.state.add_tweet(tweet.id)
             return
 
@@ -235,13 +271,17 @@ class VeniceBot:
                 if not self.state.get_allowed_author(tweet.conversation_id):
                     self.state.set_allowed_author(tweet.conversation_id, tweet.author_id)
                 self.state.add_tweet(tweet.id)
+                log(reply=final, posted=True, reply_id=str(resp.data["id"]))
                 logger.info(f"Replied to tweet {tweet.id} (user {tweet.author_id}: {self.user_reply_counts.get(str(tweet.author_id), 0)} this hour)")
             else:
                 logger.warning(f"Reply returned None for tweet {tweet.id}")
+                log(reply=final, skipped="post_failed")
         except tweepy.errors.TooManyRequests as e:
+            log(reply=final, skipped="rate_limited")
             self._wait_for_rate_limit(e)
         except Exception as e:
             logger.error(f"Error posting reply: {e}")
+            log(reply=final, skipped=f"post_error: {e}")
 
         time.sleep(Config.TWEET_DELAY)
 

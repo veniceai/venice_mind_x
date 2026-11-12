@@ -79,6 +79,20 @@ _IMAGES_INTRO = {"type": "text", "text": "Images from the X thread (listed in th
 _XAI_NATIVE_TOOL_NAMES = {"x_keyword_search", "x_semantic_search", "x_user_search", "x_thread_fetch"}
 
 
+# Which models answered and what they cost, for the reply log. analyse() starts
+# a fresh trace for each mention; crafter and rewrite calls add to it.
+_trace: dict = {"route": None, "calls": []}
+
+
+def reset_trace() -> None:
+    _trace["route"] = None
+    _trace["calls"] = []
+
+
+def get_trace() -> dict:
+    return {"route": _trace["route"], "calls": list(_trace["calls"])}
+
+
 def _date_context() -> str:
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     return (
@@ -208,9 +222,15 @@ def _chat(
         )
         r.raise_for_status()
         body = r.json()
+        citations = (body.get("venice_parameters") or {}).get("web_search_citations") or []
         if evidence is not None:
-            for c in (body.get("venice_parameters") or {}).get("web_search_citations") or []:
+            for c in citations:
                 evidence.append(f"[web] {c.get('title')} ({c.get('date')}): {c.get('content')} {c.get('url')}")
+        _trace["calls"].append({
+            "model": model,
+            "citations": len(citations),
+            "cost_usd": (body.get("cost") or {}).get("usd"),
+        })
         return body["choices"][0]["message"]
     except requests.exceptions.HTTPError as e:
         status = e.response.status_code if e.response is not None else None
@@ -221,9 +241,11 @@ def _chat(
             logger.error(f"Venice API error ({model}): HTTP {status} — {hint}")
         else:
             logger.error(f"Venice API error ({model}): {e}")
+        _trace["calls"].append({"model": model, "error": f"HTTP {status}" if status else str(e)})
         return None
     except Exception as e:
         logger.error(f"Venice API error ({model}): {e}")
+        _trace["calls"].append({"model": model, "error": str(e)})
         return None
 
 
@@ -339,6 +361,7 @@ def analyse(
       call; suspicious ones are flagged to the AI so it can warn the user.
       Nothing is scraped.
     """
+    reset_trace()
     target = Config.reply_target()
     images = list(images or [])
     has_image = bool(images or image_bytes or image_url)
@@ -418,6 +441,10 @@ def analyse(
 
     # ── MODEL CASCADE ──
     r = route(query, context, has_image)
+    _trace["route"] = {
+        "lane": r.lane, "charged": r.charged, "filtered": r.filtered,
+        "complex": r.complex, "private_info": r.private_info, "reason": r.reason,
+    }
     if r.decline:
         logger.warning(f"🔒 Declining a request for someone's private details: {query[:80]}")
         return f"[FINAL_REPLY]{Config.DECLINE_PRIVATE_INFO}[/FINAL_REPLY]"

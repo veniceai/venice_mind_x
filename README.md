@@ -64,6 +64,8 @@ DRY_RUN=true python main.py
 touch PAUSED
 ```
 
+Every mention the bot handles is logged to `logs/replies.jsonl`: the route, the models and their cost, the gate's verdict, the reply, and whether it posted. See `docs/OPERATOR.md`.
+
 ## Refreshing Venice knowledge
 
 The bot answers Venice questions from a committed FAQ snapshot and the live

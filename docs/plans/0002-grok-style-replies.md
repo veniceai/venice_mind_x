@@ -262,8 +262,11 @@ switch short of removing it.
   post unchecked, logged at ERROR.
 - **Charged lane:** bake-off of DeepSeek 1017 Uncensored against Grok 4.3 with
   native X search, `scripts/bakeoff_charged.py`.
-- Sabrina's branch carries scraping off, the date line, the reply log, the
-  pause switch and the length check.
+- **Sabrina's pieces, now on this branch:** scraping off (and the unused
+  `web_search_urls` removed), today's date in every system message, the reply
+  length target enforced in `craft_tweet()` and `rewrite_reply()`, a `PAUSED`
+  file that stops the loop without a restart, and `logs/replies.jsonl` with one
+  record per handled mention.
 
 ## Cost per reply (estimate)
 
