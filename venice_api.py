@@ -339,7 +339,6 @@ def analyse(
       call; suspicious ones are flagged to the AI so it can warn the user.
       Nothing is scraped.
     """
-    char_limit = Config.char_limit()
     target = Config.reply_target()
     images = list(images or [])
     has_image = bool(images or image_bytes or image_url)
@@ -390,19 +389,10 @@ def analyse(
             + "\n\n".join(knowledge_parts)
         )
 
-    if target < char_limit:
-        length_rule = (
-            f"LENGTH: keep the text inside [FINAL_REPLY] under {target} characters. "
-            f"Write economically and don't mention the length."
-        )
-    else:
-        safe_limit = max(1, char_limit - 15)
-        length_rule = (
-            f"HARD LENGTH LIMIT: the text inside [FINAL_REPLY] MUST be {char_limit} characters "
-            f"or fewer. Count the characters before finishing. Aim for {safe_limit} or fewer for "
-            f"a safety margin. If your draft runs long, tighten and cut words until it fits — "
-            f"never exceed {char_limit}. Going over forces a wasteful rewrite, so fit it the first time."
-        )
+    length_rule = (
+        f"LENGTH: most replies are one or two sentences. Keep the text inside [FINAL_REPLY] "
+        f"under {target} characters; shorter is better. Don't mention the length."
+    )
     msg += (
         f"\n\nOUTPUT (strict):\n"
         f"[FINAL_REPLY]\n"
@@ -466,16 +456,16 @@ def craft_tweet(
     If the analysis already contains a valid [FINAL_REPLY], use it directly.
     Otherwise, ask the crafter model to rewrite (DeepSeek, low reasoning, no web).
 
-    SAFETY: Final output is scanned for scam endorsement AND censorship.
+    SAFETY: Final output is scanned for scam endorsement AND censorship, and
+    nothing over Config.reply_target() comes back (ERROR_MESSAGE instead).
     """
-    char_limit = Config.char_limit()
     target = Config.reply_target()
 
     # Try to extract a ready-made reply
     m = _FINAL_RE.search(analysis)
     if m:
         candidate = _strip_refs(m.group(1).strip())
-        if len(candidate) <= char_limit and not any(b in candidate for b in _BANNED):
+        if len(candidate) <= target and not any(b in candidate for b in _BANNED):
             if not is_censored(candidate):
                 is_safe, reason = scan_output(candidate, context_urls)
                 if not is_safe:
@@ -507,9 +497,9 @@ def craft_tweet(
         logger.info("🔓 Crafter censored — retrying with the fallback model")
         result = _call_venice(Config.MODEL_FALLBACK, Config.CRAFTER_PROMPT, prompt, temperature=0.6, **craft)
 
-    if not result or len(result) > char_limit or any(b in result for b in _BANNED):
+    if not result or len(result) > target or any(b in result for b in _BANNED):
         strict = (
-            f"CRITICAL: must be ≤{min(target, char_limit)} chars. No greetings, no hashtags. "
+            f"CRITICAL: must be ≤{target} chars. No greetings, no hashtags. "
             f"Rewrite this:\n{source_text}"
         )
         result = _call_venice(Config.MODEL_UNBIASED, Config.CRAFTER_PROMPT, strict, temperature=0.5, **craft)
@@ -517,7 +507,8 @@ def craft_tweet(
     if not result:
         result = _call_venice(Config.MODEL_LAST_RESORT, Config.CRAFTER_PROMPT, prompt, temperature=0.5, web=False)
 
-    if not result:
+    if not result or len(result) > target:
+        logger.warning(f"No reply under {target} characters; not replying")
         return Config.ERROR_MESSAGE
 
     # ── OUTPUT SAFETY SCAN ──
@@ -558,4 +549,7 @@ def rewrite_reply(reply: str, failed_check: str) -> Optional[str]:
     if out:
         m = _FINAL_RE.search(out)
         out = _strip_refs(m.group(1).strip()) if m else out
+    if out and len(out) > Config.reply_target():
+        logger.warning(f"The {failed_check} rewrite came back over {Config.reply_target()} characters")
+        return None
     return out or None

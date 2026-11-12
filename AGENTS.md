@@ -112,6 +112,11 @@ builder and the tool loop without needing credentials.
   don't turn it back on. Venice also drops unknown `venice_parameters` keys
   without an error (the old `web_search_urls` never did anything), so check the
   docs before adding one.
+- **Only `Config.reply_target()` belongs in prompts and length checks.**
+  `char_limit()` is what X accepts (25,000 with Premium); when that number
+  reached the prompt, replies ballooned. `craft_tweet()` and `rewrite_reply()`
+  return nothing over the target, so an over-long reply is rewritten or dropped,
+  never posted.
 - **Every Venice call states today's date** (`_date_context()` in
   `_call_venice`). The bot sends `include_venice_system_prompt: false`, so
   nothing else tells the model the date, and without it the model treats its
