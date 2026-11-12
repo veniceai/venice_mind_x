@@ -560,6 +560,10 @@ _REWRITE_INSTRUCTIONS = {
         "Rewrite this reply without any yield, return, APR, APY, ROI or percentage figure "
         "for VVV, sVVV or DIEM. Keep the rest as it is."
     ),
+    "speculation": (
+        "Rewrite this reply without any speculation or insinuation about a person's health, "
+        "private life or alleged wrongdoing that the sources don't report. Keep the rest as it is."
+    ),
 }
 
 

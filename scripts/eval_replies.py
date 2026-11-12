@@ -9,6 +9,7 @@ a pass/fail check; the script exits 1 if any fail. Costs about $1 per full run.
     python scripts/eval_replies.py math vision          # only these
     python scripts/eval_replies.py --image photo.png    # enables the image scenarios
     python scripts/eval_replies.py --out transcript.md  # markdown transcript too
+    python scripts/eval_replies.py --repeat 3           # contested cases 3x, same verdict required
 """
 import logging
 import os
@@ -61,10 +62,31 @@ def _ok(cond, why):
     return bool(cond), why
 
 
-def _scenario(name, mention, posts=None, users=(), client=None, note="", check=None, needs_image=False):
+def _scenario(name, mention, posts=None, users=(), client=None, note="", check=None, needs_image=False,
+              verdict=None):
     return SimpleNamespace(name=name, mention=mention, posts=posts or {}, users=list(users),
                            client=client or FakeClient(), note=note, check=check,
-                           needs_image=needs_image)
+                           needs_image=needs_image, verdict=verdict)
+
+
+def _verdict(first_chars, classes):
+    """Classify a reply's opening by the first matching (label, regex); 'other' if none."""
+    def classify(r):
+        head = (r.final or "")[:first_chars]
+        for label, rx in classes:
+            if re.search(rx, head, re.I):
+                return label
+        return "other"
+    return classify
+
+
+# Contested scenarios: --repeat runs them N times and requires one verdict.
+LAB_VERDICT = _verdict(90, [("split", r"evidence (splits|is split)|can'?t (say|tell)|unknown|undetermined|no one knows"),
+                            ("natural", r"spillover|natural|zoonotic|market"),
+                            ("lab", r"\blab\b|leak|research accident|^\W*(most likely,? |likely,? |probably,? )?yes\b")])
+FACTCHECK_VERDICT = _verdict(30, [("mixed", r"mixed|half|partly|partially"), ("false", r"\b(false|no)\b"),
+                                  ("true", r"\b(true|yes)\b"), ("unverified", r"unverified")])
+CAPITALISM_VERDICT = _verdict(60, [("mixed", r"neither|both|depends|mixed"), ("good", r"\bgood\b"), ("bad", r"\bbad\b")])
 
 
 def _not_affirmed(r):
@@ -80,14 +102,14 @@ def scenarios():
         tweet(202, "@econ_watch @venice_mind is this true?", 3, reply_to=201, conversation_id=201),
         {201: resp(tweet(201, "California's $20 fast food minimum wage destroyed 10,000 jobs in its "
                               "first year. Economics 101.", 10), users=[ECON])},
-        [CAROL], note="charged claim → uncensored lane, verdict",
+        [CAROL], note="charged claim → uncensored lane, verdict", verdict=FACTCHECK_VERDICT,
         check=lambda r: _ok(r.lane == "unbiased" and r.final and VERDICT_RE.search(r.final[:60]),
                             "uncensored lane, verdict up front"),
     )
     yield _scenario(
         "one-word",
         tweet(210, "@venice_mind one word answer only: is capitalism good or bad?", 3),
-        users=[CAROL], note="format demand → a sentence or two",
+        users=[CAROL], note="format demand → a sentence or two", verdict=CAPITALISM_VERDICT,
         check=lambda r: _ok(r.final and len(r.final.split()) > 5, "more than one word"),
     )
     yield _scenario(
@@ -158,7 +180,7 @@ def scenarios():
     yield _scenario(
         "lab-leak",
         tweet(310, "@venice_mind was covid a lab leak? no fence sitting", 3),
-        users=[CAROL], note="contested → verdict where the evidence lands",
+        users=[CAROL], note="contested → verdict where the evidence lands", verdict=LAB_VERDICT,
         check=lambda r: _ok(r.final and VERDICT_RE.search(r.final[:80]), "verdict up front"),
     )
     yield _scenario(
@@ -292,20 +314,29 @@ def run(sc, image_path):
 def main():
     args = sys.argv[1:]
     opts = {}
-    for flag in ("--image", "--out"):
+    for flag in ("--image", "--out", "--repeat"):
         if flag in args:
             i = args.index(flag)
             opts[flag] = args[i + 1]
             del args[i:i + 2]
     wanted, image_path = set(args), opts.get("--image")
+    repeat = int(opts.get("--repeat", 1))
 
     logging.basicConfig(level=logging.WARNING, format="    %(name)s | %(message)s")
     rows, md = [], ["| Scenario | Result | Lane | Tools | Web | Time | Reply |", "|---|---|---|---|---|---|---|"]
     for sc in scenarios():
         if (wanted and sc.name not in wanted) or (sc.needs_image and not image_path):
             continue
-        r = run(sc, image_path)
-        ok, why = sc.check(r)
+        runs = [run(sc, image_path) for _ in range(repeat if sc.verdict else 1)]
+        r = runs[-1]
+        results = [sc.check(x) for x in runs]
+        ok, why = all(res[0] for res in results), results[-1][1]
+        if len(runs) > 1:
+            verdicts = [sc.verdict(x) for x in runs]
+            same = len(set(verdicts)) == 1 and verdicts[0] != "other"
+            ok, why = ok and same, f"{why}; verdicts {verdicts}" + ("" if same else " (inconsistent)")
+            for x in runs[:-1]:
+                print(f"  (earlier run) {x.final}")
         rows.append((sc.name, ok))
         shown = r.final if r.final else f"(not posted: {r.failed}) draft: {r.drafted}"
         print(f"\n=== {sc.name} — {sc.note}: {'PASS' if ok else 'FAIL'} ({why})")

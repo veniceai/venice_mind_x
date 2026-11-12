@@ -12,7 +12,7 @@ def _wire(monkeypatch, gate_results, rewrites):
 
     def rewrite_reply(text, failed):
         calls["rewrite"].append((text, failed))
-        if failed not in ("unsupported", "token_returns"):
+        if failed not in ("unsupported", "token_returns", "speculation"):
             return None
         return rew.pop(0) if rew else None
 
@@ -53,3 +53,10 @@ def test_token_returns_regex_runs_even_if_the_gate_would_pass(monkeypatch):
     assert (out, failed) == ("DIEM gives $1/day of API credit.", None)
     assert calls["rewrite"][0][1] == "token_returns"
     assert len(calls["gate"]) == 1      # the regex caught the first draft before the gate
+
+
+def test_speculation_is_rewritten_once(monkeypatch):
+    calls = _wire(monkeypatch, ["speculation", None], ["Unverified. No outlet reports it."])
+    out, failed = finalize.finalize_reply("Unverified, but staff would call it dehydration.")
+    assert (out, failed) == ("Unverified. No outlet reports it.", None)
+    assert calls["rewrite"][0][1] == "speculation"

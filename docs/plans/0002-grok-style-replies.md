@@ -245,7 +245,9 @@ switch short of removing it.
 - **Gate:** three more questions, judged against the thread plus evidence (web
   citations Venice returns, posts the X tools fetched): unsupported claims about
   a real person's recent actions, health or death or about a recent event;
-  speculation about a private person; VVV/DIEM return figures. On eleven
+  speculation or insinuation about anyone's health, private life or alleged
+  wrongdoing (widened 2026-11-12 to public figures, after a Schumer reply
+  hinted at a cover-up); VVV/DIEM return figures. On eleven
   sample replies the gate flagged all five bad ones (false hospitalization,
   death hoax, private speculation, DIEM yield, reporting called fabricated)
   and none of the six good ones. `finalize.py` gives an unsupported claim or a

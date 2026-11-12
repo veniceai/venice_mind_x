@@ -35,7 +35,7 @@ JSON file. It is deployed as a plain `python main.py` process.
 | `reply_log.py` | `log_reply()`: appends a JSON line to `logs/replies.jsonl` (route, models, cost, gate result, reply, posted). Never raises. The trace it logs comes from `venice_api.get_trace()`. |
 | `config.py` | **Single source of truth** for settings, model IDs, and the two system prompts (`ANALYST_PROMPT`, `CRAFTER_PROMPT`). |
 | `router.py` | One Clef call (`POST /decisions`, four yes/no questions) per mention → uncensored lane (DeepSeek) or complex lane (Kimi K3), or a decline for doxxing requests. `choose_lane` is pure. |
-| `reply_gate.py` | Clef check of the final reply, with the thread and evidence (web citations, fetched posts): the four hard lines, unsupported claims about real people or recent events, private-person speculation, VVV/DIEM returns. Fails open, logs ERROR. |
+| `reply_gate.py` | Clef check of the final reply, with the thread and evidence (web citations, fetched posts): the four hard lines, unsupported claims about real people or recent events, speculation or insinuation about anyone's health, private life or alleged wrongdoing (public figures included), VVV/DIEM returns. Fails open, logs ERROR. |
 | `finalize.py` | `finalize_reply()`: `fit_x_rules`, the `mentions_token_returns` regex backstop, the gate; one rewrite for an unsupported claim or a token-return figure, otherwise not posted. |
 | `venice_api.py` | Venice chat-completion calls. The two-pass `analyse()` + `craft_tweet()` pipeline, the function-calling tool loop, and the per-lane model cascade. |
 | `x_context.py` | Builds the thread a mention gets: reply chain with authors, `note_tweet` full text, quotes, x.com links via the API, images + video thumbnails. |

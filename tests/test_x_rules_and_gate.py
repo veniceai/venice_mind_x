@@ -67,7 +67,7 @@ def test_gate_sees_thread_and_sources(monkeypatch):
     reply_gate.crossed_line("Yes.", thread="X THREAD", sources="[web] Reuters")
     assert calls[0]["state"]["thread"] == "X THREAD"
     assert calls[0]["state"]["sources"] == "[web] Reuters"
-    assert {"unsupported", "private_speculation", "token_returns"} <= set(calls[0]["questions"])
+    assert {"unsupported", "speculation", "token_returns"} <= set(calls[0]["questions"])
 
 
 def test_gate_blocks_a_crossed_line(monkeypatch):

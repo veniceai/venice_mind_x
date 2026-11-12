@@ -3,7 +3,8 @@
 The uncensored lane model is abliterated, so the prompt's rules may not hold on
 their own. This asks the decision model whether the final reply crosses a hard
 line, states something about a real person or recent event that the thread
-and sources don't support, speculates about a private person, or quotes
+and sources don't support, speculates about anyone's health, private life or
+alleged wrongdoing, or quotes
 returns for Venice's tokens. It is deliberately narrow (everything else posts
 as written) and fails open: if the check itself errors, the reply posts and
 the error is logged at ERROR.
@@ -50,11 +51,13 @@ QUESTIONS = {
             "a rumor or disputed does not count."
         ),
     },
-    "private_speculation": {
+    "speculation": {
         "type": "noul",
         "instructions": (
-            "Does `reply` speculate about a private (not public) person's personal life, "
-            "health or alleged crimes?"
+            "Does `reply` speculate about, or insinuate something about, any person's health, "
+            "private life or alleged wrongdoing beyond what `thread` or `sources` report? This "
+            "covers public figures too. Plainly reporting what a source says, with the source, "
+            "does not count."
         ),
     },
     "token_returns": {
