@@ -1,5 +1,6 @@
 """Twitter API wrappers — mentions, replies, tweet lookup."""
 import logging
+import re
 from types import SimpleNamespace
 
 import tweepy
@@ -7,16 +8,20 @@ from config import Config
 
 logger = logging.getLogger(__name__)
 
+# note_tweet carries the full text of posts over 280 characters; `text` is
+# only the truncated preview for those.
 _TWEET_FIELDS = [
     "created_at", "author_id", "attachments", "public_metrics",
     "conversation_id", "referenced_tweets", "in_reply_to_user_id", "entities",
+    "note_tweet", "lang",
 ]
 _EXPANSIONS = [
     "attachments.media_keys", "author_id",
-    "in_reply_to_user_id", "referenced_tweets.id",
+    "in_reply_to_user_id", "referenced_tweets.id", "referenced_tweets.id.author_id",
 ]
-_MEDIA_FIELDS = ["type", "url", "preview_image_url"]
-_USER_FIELDS = ["protected", "verified", "username"]
+_MEDIA_FIELDS = ["type", "url", "preview_image_url", "alt_text"]
+_USER_FIELDS = ["protected", "verified", "username", "name"]
+_PROFILE_FIELDS = ["username", "name", "description", "verified", "public_metrics", "created_at"]
 
 
 def get_mentions(
@@ -35,8 +40,8 @@ def get_mentions(
     max_total = max_results or Config.MAX_MENTIONS_PER_CHECK
 
     data = []
-    media, users = [], []
-    seen_media, seen_users = set(), set()
+    media, users, tweets = [], [], []
+    seen_media, seen_users, seen_tweets = set(), set(), set()
     token = None
 
     while len(data) < max_total:
@@ -48,6 +53,9 @@ def get_mentions(
             "expansions": _EXPANSIONS,
             "media_fields": _MEDIA_FIELDS,
             "user_fields": _USER_FIELDS,
+            # User context, not the app bearer token: X bills an account's own
+            # mentions as Owned Reads ($0.001 vs $0.005 per post) only then.
+            "user_auth": True,
         }
         if start_time:
             kwargs["start_time"] = start_time
@@ -69,12 +77,49 @@ def get_mentions(
             if u.id not in seen_users:
                 seen_users.add(u.id)
                 users.append(u)
+        for t in includes.get("tweets", []):
+            if t.id not in seen_tweets:
+                seen_tweets.add(t.id)
+                tweets.append(t)
 
         token = (resp.meta or {}).get("next_token")
         if not token:
             break
 
-    return SimpleNamespace(data=data[:max_total], includes={"media": media, "users": users})
+    return SimpleNamespace(
+        data=data[:max_total],
+        includes={"media": media, "users": users, "tweets": tweets},
+    )
+
+
+# twitter-text's cashtag shape: $ + 1-6 letters, optional ._ suffix.
+_CASHTAG_RE = re.compile(r"(?<![\w$])\$([A-Za-z]{1,6}(?:[._][A-Za-z]{1,2})?)(?![\w])")
+_HANDLE_RE = re.compile(r"(?<![\w@])@(\w{1,15})\b")
+# Links with a scheme, and schemeless links with a path. Bare domains such as
+# venice.ai (in the scam warnings) stay.
+_LINK_RE = re.compile(
+    r"https?://\S+|(?<![@\w.])(?:[a-z0-9-]+\.)+[a-z]{2,}/[^\s'\"()]*", re.IGNORECASE
+)
+
+
+def fit_x_rules(text: str, participants=()) -> str:
+    """Make a reply acceptable to X's self-serve posting rules, and cheap.
+
+    X rejects API posts with more than one cashtag, and only lets API posts
+    @mention accounts already in the conversation. Extra cashtags lose their $;
+    @handles outside `participants` lose their @. Links are removed: a post
+    with a URL costs $0.20 against $0.01 for a summoned reply.
+    """
+    text = re.sub(r"[ \t]{2,}", " ", _LINK_RE.sub("", text)).strip()
+    seen = {"n": 0}
+
+    def cashtag(m):
+        seen["n"] += 1
+        return m.group(0) if seen["n"] == 1 else m.group(1)
+
+    allowed = {p.lower() for p in participants if p}
+    text = _CASHTAG_RE.sub(cashtag, text)
+    return _HANDLE_RE.sub(lambda m: m.group(0) if m.group(1).lower() in allowed else m.group(1), text)
 
 
 def reply_to_tweet(client: tweepy.Client, tweet_id: int, text: str):
@@ -114,7 +159,36 @@ def get_tweet_by_id(client: tweepy.Client, tweet_id: int):
         tweet_fields=_TWEET_FIELDS,
         expansions=_EXPANSIONS,
         media_fields=_MEDIA_FIELDS,
-        user_fields=["username", "name"],
+        user_fields=_USER_FIELDS,
+    )
+
+
+def search_recent(client: tweepy.Client, query: str, *, latest: bool = False, max_results: int = None):
+    """Recent search (last 7 days). Needs recent-search access on the X API plan."""
+    return client.search_recent_tweets(
+        query=query,
+        max_results=max(10, min(100, max_results or Config.X_SEARCH_MAX_RESULTS)),
+        sort_order="recency" if latest else "relevancy",
+        tweet_fields=_TWEET_FIELDS,
+        expansions=_EXPANSIONS,
+        media_fields=_MEDIA_FIELDS,
+        user_fields=_USER_FIELDS,
+    )
+
+
+def get_user_by_username(client: tweepy.Client, username: str):
+    return client.get_user(username=username, user_fields=_PROFILE_FIELDS)
+
+
+def get_user_posts(client: tweepy.Client, user_id, max_results: int = None):
+    return client.get_users_tweets(
+        user_id,
+        max_results=max(5, min(100, max_results or Config.X_USER_RECENT_POSTS)),
+        exclude=["retweets"],
+        tweet_fields=_TWEET_FIELDS,
+        expansions=_EXPANSIONS,
+        media_fields=_MEDIA_FIELDS,
+        user_fields=_USER_FIELDS,
     )
 
 

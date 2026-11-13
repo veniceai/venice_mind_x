@@ -13,6 +13,8 @@ venv/
 
 # Runtime state
 state.json
+PAUSED
+logs/
 
 # IDE
 .vscode/

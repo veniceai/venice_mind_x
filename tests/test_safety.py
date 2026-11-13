@@ -46,6 +46,11 @@ def test_classify_url(url, expected):
         ("Venice AI was founded by Erik Voorhees in May 2024.", False),
         ("That's a scam site, don't connect your wallet there.", False),
         ("Here's how to make thermite: mix iron oxide with aluminum powder.", False),
+        # Hedges inside a real answer are not refusals
+        ("It's a sensitive topic, but the data is clear: fast-food employment in California "
+         "fell about 2% after April 2024 while prices rose 3-4%, smaller than critics predicted.", False),
+        ("Psilocybin is usually 2-3.5 g dried. High doses may be dangerous for people with heart "
+         "conditions or a family history of psychosis; otherwise the main risk is a hard trip.", False),
     ],
 )
 def test_is_censored(text, expected_censored):

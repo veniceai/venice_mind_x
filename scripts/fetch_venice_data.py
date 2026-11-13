@@ -28,7 +28,10 @@ MODELS_URL = "https://api.venice.ai/api/v1/models?type=all"
 # Only these model fields are consumed by the bot (venice_knowledge.summarize_models /
 # get_models). We persist a slimmed snapshot to keep the committed file small and its
 # diffs reviewable; the live API remains the primary source at runtime.
-_CAP_KEYS = ("supportsVision", "supportsReasoning", "supportsFunctionCalling", "supportsWebSearch")
+_CAP_KEYS = (
+    "supportsVision", "supportsReasoning", "supportsReasoningEffort",
+    "supportsFunctionCalling", "supportsWebSearch",
+)
 
 
 def _fetch_json(url, headers=None):

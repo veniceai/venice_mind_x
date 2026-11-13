@@ -371,12 +371,12 @@ def screen_urls(urls: List[str]) -> Tuple[List[str], List[str], List[str]]:
     """
     Screen a list of URLs. Returns (safe_urls, suspicious_urls, blocked_urls).
     
-    - Safe: official Venice domains, passed to AI for scraping
+    - Safe: official Venice domains and unrelated sites; no warning needed
     - Suspicious: Venice lookalikes or scam patterns, AI will warn user
     - Blocked: known scam domains, AI will refuse
-    
-    Unknown URLs (random websites unrelated to Venice) are treated as safe
-    to scrape — we only warn about URLs that look like Venice impersonation.
+
+    Unknown URLs (random websites unrelated to Venice) count as safe: we only
+    warn about URLs that look like Venice impersonation. Nothing is scraped.
     """
     safe = []
     suspicious = []
@@ -393,8 +393,8 @@ def screen_urls(urls: List[str]) -> Tuple[List[str], List[str], List[str]]:
             suspicious.append(url)
             logger.warning(f"⚠️ SUSPICIOUS URL (Venice lookalike or scam pattern): {url}")
         else:
-            # Unknown URLs that don't look like Venice impersonation are fine
-            # We allow scraping them normally — no need to warn the user
+            # Unknown URLs that don't look like Venice impersonation are fine;
+            # no need to warn the user
             safe.append(url)
 
     return safe, suspicious, blocked
@@ -659,7 +659,7 @@ def get_injection_warning_reply(signals: List[str] = None) -> str:
 # CENSORSHIP DETECTION
 # ═════════════════════════════════════════════════════════════════
 # Detects when a model refuses/self-censors so we can retry with
-# the uncensored fallback (GLM Heretic).
+# the next model in the lane (venice_api._lane_chain).
 
 # Phrases that indicate the model is refusing to answer
 _REFUSAL_PATTERNS = [
@@ -674,21 +674,26 @@ _REFUSAL_PATTERNS = [
     r"as an AI (?:language )?model",
     r"as a (?:responsible|helpful) AI",
     r"my (?:programming|training|guidelines) (?:prevents?|doesn'?t allow)",
-    # Safety theater
-    r"(?:could|might|may) (?:be )?(?:harmful|dangerous|offensive|inappropriate|unethical)",
     r"I'?m (?:designed|programmed|trained) to (?:be safe|avoid|not)",
+]
+_REFUSAL_RE = re.compile("|".join(_REFUSAL_PATTERNS), re.IGNORECASE)
+
+# Hedges, deflections and moralizing. Inside a real answer they are just
+# hedges (a reply can say "a sensitive topic" and still answer), so they only
+# count when they are essentially the whole reply.
+_HEDGE_PATTERNS = [
+    r"(?:could|might|may) (?:be )?(?:harmful|dangerous|offensive|inappropriate|unethical)",
     r"(?:promote|encourage|endorse|glorify|facilitate) (?:harmful|illegal|dangerous|violence)",
     r"(?:sensitive|controversial|inappropriate) (?:topic|subject|content|material)",
-    # Deflections
     r"I(?:'d| would) (?:encourage|suggest|recommend) (?:you |that you )?(?:consult|speak|talk|reach out)",
     r"please (?:consult|contact|reach out to|speak with) a (?:professional|qualified|licensed)",
     r"(?:seek|get) (?:professional|medical|legal|qualified) (?:help|advice|assistance|guidance)",
-    # Moralizing filler
     r"it'?s important to (?:note|remember|consider|understand) that",
     r"I want to (?:emphasize|stress|remind|be clear) that",
     r"while I understand (?:your|the) (?:question|interest|curiosity)",
 ]
-_REFUSAL_RE = re.compile("|".join(_REFUSAL_PATTERNS), re.IGNORECASE)
+_HEDGE_RE = re.compile("|".join(_HEDGE_PATTERNS), re.IGNORECASE)
+_HEDGE_ONLY_MAX_CHARS = 120
 
 # Short non-answers that are essentially refusals
 _EMPTY_REFUSALS = [
@@ -729,6 +734,12 @@ def is_censored(text: Optional[str]) -> bool:
             logger.info(f"🔓 Censorship detected (pattern '{match.group()}'): {text[:120]}…")
             return True
 
+    # A reply that is nothing but a hedge or a deflection
+    hedge = _HEDGE_RE.search(text)
+    if hedge and len(text) < _HEDGE_ONLY_MAX_CHARS:
+        logger.info(f"🔓 Censorship detected (hedge-only reply '{hedge.group()}'): {text}")
+        return True
+
     # Very short response that smells like a dodge
     if len(text) < 60 and any(
         phrase in text.lower()
@@ -737,4 +748,25 @@ def is_censored(text: Optional[str]) -> bool:
         logger.info(f"🔓 Censorship detected (short refusal): {text}")
         return True
 
+    return False
+
+
+# ═════════════════════════════════════════════════════════════════
+# VENICE TOKEN RETURNS
+# ═════════════════════════════════════════════════════════════════
+# Return, yield or price-performance claims about Venice's own tokens need
+# brand/legal approval. Deterministic backstop for the reply gate, which fails
+# open: a yield word or a percentage within 80 characters of VVV, sVVV or DIEM.
+
+_TOKEN_NAME_RE = re.compile(r"\$?\b(?:s?VVV|DIEM)\b", re.IGNORECASE)
+_RETURN_FIGURE_RE = re.compile(r"\b(?:yield|APR|APY|ROI)\b|\d+(?:\.\d+)?\s?%", re.IGNORECASE)
+
+
+def mentions_token_returns(text: Optional[str]) -> bool:
+    if not text:
+        return False
+    for m in _TOKEN_NAME_RE.finditer(text):
+        window = text[max(0, m.start() - 80): m.end() + 80]
+        if _RETURN_FIGURE_RE.search(window):
+            return True
     return False

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-06-04T04:05:34.070Z",
+  "generatedAt": "2026-11-10T14:23:45.222Z",
   "locales": {
     "en": {
       "sourceLocale": "en",
@@ -163,6 +163,36 @@
               "url": "https://venice.ai/faqs#faq-vvv-contract-address"
             },
             {
+              "id": "faq-vvv-eoa-minting-control",
+              "title": "Can a single externally owned account (EOA) mint unlimited VVV tokens?",
+              "markdown": "No. The VVV token contract (`0xacfe6019ed1a7dc6f7b508c02d1b04ec88cc21bf`) returns `owner()` = `0x321b7ff75154472B18EDb199033fF4D116F340Ff`. This is the staking contract, not an externally owned account.",
+              "url": "https://venice.ai/faqs#faq-vvv-eoa-minting-control"
+            },
+            {
+              "id": "faq-vvv-staking-contract-control",
+              "title": "Who controls the VVV staking contract?",
+              "markdown": "The staking contract's owner is `0x2D8CB8DC596daD0e1E34E2042E7ae6Df93B11524`. This address is a Safe multisig with deployed bytecode, not a lone EOA. You can verify this directly on BaseScan.",
+              "url": "https://venice.ai/faqs#faq-vvv-staking-contract-control"
+            },
+            {
+              "id": "faq-vvv-owner-arbitrary-minting",
+              "title": "Can the owner mint arbitrary amounts of VVV?",
+              "markdown": "No. The staking contract only mints according to its public `emissionRatePerSecond()` value. There is no function that allows arbitrary large mints to the owner. Any change to this logic would require a multisig-approved contract upgrade.",
+              "url": "https://venice.ai/faqs#faq-vvv-owner-arbitrary-minting"
+            },
+            {
+              "id": "faq-vvv-contract-technical-details",
+              "title": "What are the key technical details of the VVV contracts?",
+              "markdown": "- Ownership and minting follow standard patterns used by many staking and rewards tokens.\n- Emission rate adjustments are recorded as on-chain `EmissionRateUpdated` events.\n- Permit functionality follows the EIP-2612 standard, the same pattern used by USDC, DAI, and thousands of other tokens.\n- All administrative control sits with a multisig rather than a single EOA.",
+              "url": "https://venice.ai/faqs#faq-vvv-contract-technical-details"
+            },
+            {
+              "id": "faq-vvv-contract-verification",
+              "title": "How can I verify VVV contract control and emissions myself?",
+              "markdown": "All three core facts are public read functions on BaseScan:\n\n1. VVV `owner()` returns the staking contract.\n2. The staking contract `owner()` returns a multisig address with deployed bytecode.\n3. The staking contract `emissionRatePerSecond()` shows the current rate, and historical changes are visible through on-chain events.\n\nEverything above can be checked directly on the same contract pages.",
+              "url": "https://venice.ai/faqs#faq-vvv-contract-verification"
+            },
+            {
               "id": "faq-vvv-burned",
               "title": "How much VVV has been burned?",
               "markdown": "You can check the current burn of VVV here: [venice.ai/token/burns](https://venice.ai/token/burns).",
@@ -177,13 +207,13 @@
             {
               "id": "faq-vvv-tokenomics",
               "title": "What are the tokenomics of the Venice token (VVV)?",
-              "markdown": "The VVV token has an initial supply of 100 million, allocated as follows: 50% to Venice users and the AI community via airdrop, 35% to [Venice.ai](https://venice.ai) for development and growth, 10% to an incentive fund to support ecosystem development, and 5% for liquidity provision. Annual emissions started at 10 million VVV per year at token launch, reduced to 8 million, then to 6 million in February 2026. You can view the current supply [here](https://coinmarketcap.com/currencies/venice-token/).\n\nFundamental demand comes from utility. You can stake VVV to earn yield and, when you want tokenized compute, lock your staked VVV (sVVV) to mint DIEM. Staked DIEM provides 1 dollar per day of Venice API credit per token, delivering private, uncensored inference without per-request fees. For example, staking 100 DIEM provides 100 dollars per day of API credit.",
+              "markdown": "The VVV token has an initial supply of 100 million, allocated as follows: 50% to Venice users and the AI community via airdrop, 35% to [Venice.ai](https://venice.ai) for development and growth, 10% to an incentive fund to support ecosystem development, and 5% for liquidity provision. Annual emissions started at 14 million VVV at launch and have been reduced several times since; as of October 1, 2026 they are 2 million VVV per year. You can view the current supply [here](https://coinmarketcap.com/currencies/venice-token/).\n\nFundamental demand comes from utility. You can stake VVV to earn yield and, when you want tokenized compute, lock your staked VVV (sVVV) to mint DIEM. Staked DIEM provides 1 dollar per day of Venice API credit per token, delivering private, uncensored inference without per-request fees. For example, staking 100 DIEM provides 100 dollars per day of API credit.",
               "url": "https://venice.ai/faqs#faq-vvv-tokenomics"
             },
             {
               "id": "faq-vvv-supply-capped",
               "title": "Is the supply capped for the Venice token (VVV)?",
-              "markdown": "Genesis supply was 100M VVV. On March 12, 2025, Venice executed two token burns totaling 33,539,739 VVV ([view transaction](https://basescan.org/tx/0xf5a19b79b13274faf19c46b404a36699990cad18e907aece0ab26671ff4a37af)). Annual emissions started at 10M VVV per year at token launch, reduced to 8M, then to 6M in February 2026. You can view the current supply [here](https://coinmarketcap.com/currencies/venice-token/).",
+              "markdown": "Genesis supply was 100M VVV. On March 12, 2025, Venice executed two token burns totaling 33,539,739 VVV ([view transaction](https://basescan.org/tx/0xf5a19b79b13274faf19c46b404a36699990cad18e907aece0ab26671ff4a37af)). Annual emissions started at 14 million VVV at launch and have been reduced several times since; as of October 1, 2026 they are 2 million VVV per year. You can view the current supply [here](https://coinmarketcap.com/currencies/venice-token/).",
               "url": "https://venice.ai/faqs#faq-vvv-supply-capped"
             },
             {
@@ -195,7 +225,7 @@
             {
               "id": "faq-vvv-staking-yield",
               "title": "How does VVV staking yield work?",
-              "markdown": "After the **DIEM** upgrade the Utilization Rate split is removed. VVV stakers receive 100 percent of emissions as yield, paid in VVV. If your sVVV is locked to back minted **DIEM** you earn 80 percent of the standard staking yield while locked. Annual emissions are 10 million VVV effective August 20, 2025. At VVV launch emissions were 14 million per year and the Utilization Rate split emissions between stakers and Venice from 20 percent to 80 percent depending on demand.",
+              "markdown": "After the **DIEM** upgrade the Utilization Rate split is removed. VVV stakers receive 100 percent of emissions as yield, paid in VVV. If your sVVV is locked to back minted **DIEM** you earn 80 percent of the standard staking yield while locked. Annual emissions started at 14 million VVV at launch and have been reduced several times since; as of October 1, 2026 they are 2 million VVV per year. At launch the Utilization Rate split emissions between stakers and Venice from 20 percent to 80 percent depending on demand.",
               "url": "https://venice.ai/faqs#faq-vvv-staking-yield"
             },
             {
@@ -401,7 +431,7 @@
             {
               "id": "faq-install-venice-mobile",
               "title": "How do I install Venice on my phone or tablet?",
-              "markdown": "Venice is currently available on `Android`.\n\nYou can download the app here: [venice.ai/lp/download](https://venice.ai/lp/download). From there, you can install via Google Play or download the Android APK directly.\n\nThe **iOS app is temporarily unavailable on the App Store**. We're working to bring it back as soon as possible. If you're on iPhone, you can keep using Venice in the meantime at [venice.ai](https://venice.ai) right from your mobile browser.",
+              "markdown": "Venice is available on Android and iOS.\n\nAndroid: download the APK directly from [venice.ai/lp/download](https://venice.ai/lp/download).\n\niOS: [Apple App Store](https://apps.apple.com/us/app/venice-ai/id6742061900).\n\nApp Store policies limit model behavior, so install venice.ai as a PWA for the full uncensored experience :\n\n- **iOS (Safari): **Open [venice.ai](https://venice.ai) → Share → Add to Home Screen → Add.",
               "url": "https://venice.ai/faqs#faq-install-venice-mobile"
             },
             {
@@ -496,7 +526,7 @@
             {
               "id": "faq-image-limit-early",
               "title": "Why have I hit my image limit early?",
-              "markdown": "Features like `Enhance`, `Upscale`, and `Multi-Image Edit` use more image requests per use than a standard image generation.\n\nFor example: - `Enhance 4x` can use up to 16 image requests - `Multi-Image Edit` uses 4 image requests instead of 2\n\nThese image request limits apply to `Free` and `Pro` model usage. Pay-per-use models are separate and are not limited by the image requests included in your subscription plan.",
+              "markdown": "Features like `Enhance` and `Upscale` use more image requests per use than a standard image generation.\n\nFor example, `Enhance 4x` can use up to 16 image requests.\n\nThese image request limits apply to `Free` and `Pro` model usage. Pay-per-use models are separate and are not limited by the image requests included in your subscription plan.",
               "url": "https://venice.ai/faqs#faq-image-limit-early"
             },
             {
@@ -508,14 +538,8 @@
             {
               "id": "faq-image-requests-work",
               "title": "How do Venice image requests work?",
-              "markdown": "Venice gives you a set number of image requests for `Free` and `Pro` model usage. Different actions use those requests at different rates.\n\n- `Generating a single image`: 1 request\n- `Editing an image`: 2 requests\n- `Multi-image editing`: 4 requests\n- `Generating 2, 3, or 4 image variants`: 1 request per image\n- `2x Upscale (with enhance)`: up to 8 requests\n- `4x Upscale (with enhance)`: up to 16 requests\n- `2x Upscale (without enhance)`: up to 10 requests\n- `4x Upscale (without enhance)`: up to 20 requests\n\nYou can mix and match these actions until all the image requests included in your subscription plan are used up. These limits reset based on your first request in each rate-limit period.\n\nPay-per-use models are separate and are not limited by the image requests included in your subscription plan.",
+              "markdown": "Venice gives you a set number of image requests for `Free` and `Pro` model usage. Different actions use those requests at different rates.\n\n- `Generating a single image`: 1 request\n- `Generating 2, 3, or 4 image variants`: 1 request per image\n- `2x Upscale (with enhance)`: up to 8 requests\n- `4x Upscale (with enhance)`: up to 16 requests\n- `2x Upscale (without enhance)`: up to 10 requests\n- `4x Upscale (without enhance)`: up to 20 requests\n\nYou can mix and match these actions until all the image requests included in your subscription plan are used up. These limits reset based on your first request in each rate-limit period.\n\nPay-per-use models are separate and are not limited by the image requests included in your subscription plan.",
               "url": "https://venice.ai/faqs#faq-image-requests-work"
-            },
-            {
-              "id": "faq-edit-image-requests",
-              "title": "How does the Edit Image feature consume image requests?",
-              "markdown": "The `Edit Image` feature uses 2 image requests per edit, regardless of the size or complexity of the edit.\n\n`Multi-image editing` uses 4 image requests per operation.\n\nThese image request rules apply to `Free` and `Pro` model usage. Pay-per-use models are separate and are not limited by the image requests included in your subscription plan.",
-              "url": "https://venice.ai/faqs#faq-edit-image-requests"
             },
             {
               "id": "faq-remaining-images-day",
@@ -833,6 +857,36 @@
               "url": "https://venice.ai/faqs#faq-vvv-contract-address"
             },
             {
+              "id": "faq-vvv-eoa-minting-control",
+              "title": "Can a single externally owned account (EOA) mint unlimited VVV tokens?",
+              "markdown": "No. The VVV token contract (`0xacfe6019ed1a7dc6f7b508c02d1b04ec88cc21bf`) returns `owner()` = `0x321b7ff75154472B18EDb199033fF4D116F340Ff`. This is the staking contract, not an externally owned account.",
+              "url": "https://venice.ai/faqs#faq-vvv-eoa-minting-control"
+            },
+            {
+              "id": "faq-vvv-staking-contract-control",
+              "title": "Who controls the VVV staking contract?",
+              "markdown": "The staking contract's owner is `0x2D8CB8DC596daD0e1E34E2042E7ae6Df93B11524`. This address is a Safe multisig with deployed bytecode, not a lone EOA. You can verify this directly on BaseScan.",
+              "url": "https://venice.ai/faqs#faq-vvv-staking-contract-control"
+            },
+            {
+              "id": "faq-vvv-owner-arbitrary-minting",
+              "title": "Can the owner mint arbitrary amounts of VVV?",
+              "markdown": "No. The staking contract only mints according to its public `emissionRatePerSecond()` value. There is no function that allows arbitrary large mints to the owner. Any change to this logic would require a multisig-approved contract upgrade.",
+              "url": "https://venice.ai/faqs#faq-vvv-owner-arbitrary-minting"
+            },
+            {
+              "id": "faq-vvv-contract-technical-details",
+              "title": "What are the key technical details of the VVV contracts?",
+              "markdown": "- Ownership and minting follow standard patterns used by many staking and rewards tokens.\n- Emission rate adjustments are recorded as on-chain `EmissionRateUpdated` events.\n- Permit functionality follows the EIP-2612 standard, the same pattern used by USDC, DAI, and thousands of other tokens.\n- All administrative control sits with a multisig rather than a single EOA.",
+              "url": "https://venice.ai/faqs#faq-vvv-contract-technical-details"
+            },
+            {
+              "id": "faq-vvv-contract-verification",
+              "title": "How can I verify VVV contract control and emissions myself?",
+              "markdown": "All three core facts are public read functions on BaseScan:\n\n1. VVV `owner()` returns the staking contract.\n2. The staking contract `owner()` returns a multisig address with deployed bytecode.\n3. The staking contract `emissionRatePerSecond()` shows the current rate, and historical changes are visible through on-chain events.\n\nEverything above can be checked directly on the same contract pages.",
+              "url": "https://venice.ai/faqs#faq-vvv-contract-verification"
+            },
+            {
               "id": "faq-vvv-burned",
               "title": "How much VVV has been burned?",
               "markdown": "You can check the current burn of VVV here: [venice.ai/token/burns](https://venice.ai/token/burns).",
@@ -847,13 +901,13 @@
             {
               "id": "faq-vvv-tokenomics",
               "title": "What are the tokenomics of the Venice token (VVV)?",
-              "markdown": "The VVV token has an initial supply of 100 million, allocated as follows: 50% to Venice users and the AI community via airdrop, 35% to [Venice.ai](https://venice.ai) for development and growth, 10% to an incentive fund to support ecosystem development, and 5% for liquidity provision. Annual emissions started at 10 million VVV per year at token launch, reduced to 8 million, then to 6 million in February 2026. You can view the current supply [here](https://coinmarketcap.com/currencies/venice-token/).\n\nFundamental demand comes from utility. You can stake VVV to earn yield and, when you want tokenized compute, lock your staked VVV (sVVV) to mint DIEM. Staked DIEM provides 1 dollar per day of Venice API credit per token, delivering private, uncensored inference without per-request fees. For example, staking 100 DIEM provides 100 dollars per day of API credit.",
+              "markdown": "The VVV token has an initial supply of 100 million, allocated as follows: 50% to Venice users and the AI community via airdrop, 35% to [Venice.ai](https://venice.ai) for development and growth, 10% to an incentive fund to support ecosystem development, and 5% for liquidity provision. Annual emissions started at 14 million VVV at launch and have been reduced several times since; as of October 1, 2026 they are 2 million VVV per year. You can view the current supply [here](https://coinmarketcap.com/currencies/venice-token/).\n\nFundamental demand comes from utility. You can stake VVV to earn yield and, when you want tokenized compute, lock your staked VVV (sVVV) to mint DIEM. Staked DIEM provides 1 dollar per day of Venice API credit per token, delivering private, uncensored inference without per-request fees. For example, staking 100 DIEM provides 100 dollars per day of API credit.",
               "url": "https://venice.ai/faqs#faq-vvv-tokenomics"
             },
             {
               "id": "faq-vvv-supply-capped",
               "title": "Is the supply capped for the Venice token (VVV)?",
-              "markdown": "Genesis supply was 100M VVV. On March 12, 2025, Venice executed two token burns totaling 33,539,739 VVV ([view transaction](https://basescan.org/tx/0xf5a19b79b13274faf19c46b404a36699990cad18e907aece0ab26671ff4a37af)). Annual emissions started at 10M VVV per year at token launch, reduced to 8M, then to 6M in February 2026. You can view the current supply [here](https://coinmarketcap.com/currencies/venice-token/).",
+              "markdown": "Genesis supply was 100M VVV. On March 12, 2025, Venice executed two token burns totaling 33,539,739 VVV ([view transaction](https://basescan.org/tx/0xf5a19b79b13274faf19c46b404a36699990cad18e907aece0ab26671ff4a37af)). Annual emissions started at 14 million VVV at launch and have been reduced several times since; as of October 1, 2026 they are 2 million VVV per year. You can view the current supply [here](https://coinmarketcap.com/currencies/venice-token/).",
               "url": "https://venice.ai/faqs#faq-vvv-supply-capped"
             },
             {
@@ -865,7 +919,7 @@
             {
               "id": "faq-vvv-staking-yield",
               "title": "How does VVV staking yield work?",
-              "markdown": "After the **DIEM** upgrade the Utilization Rate split is removed. VVV stakers receive 100 percent of emissions as yield, paid in VVV. If your sVVV is locked to back minted **DIEM** you earn 80 percent of the standard staking yield while locked. Annual emissions are 10 million VVV effective August 20, 2025. At VVV launch emissions were 14 million per year and the Utilization Rate split emissions between stakers and Venice from 20 percent to 80 percent depending on demand.",
+              "markdown": "After the **DIEM** upgrade the Utilization Rate split is removed. VVV stakers receive 100 percent of emissions as yield, paid in VVV. If your sVVV is locked to back minted **DIEM** you earn 80 percent of the standard staking yield while locked. Annual emissions started at 14 million VVV at launch and have been reduced several times since; as of October 1, 2026 they are 2 million VVV per year. At launch the Utilization Rate split emissions between stakers and Venice from 20 percent to 80 percent depending on demand.",
               "url": "https://venice.ai/faqs#faq-vvv-staking-yield"
             },
             {
@@ -1071,7 +1125,7 @@
             {
               "id": "faq-install-venice-mobile",
               "title": "How do I install Venice on my phone or tablet?",
-              "markdown": "Venice is currently available on `Android`.\n\nYou can download the app here: [venice.ai/lp/download](https://venice.ai/lp/download). From there, you can install via Google Play or download the Android APK directly.\n\nThe **iOS app is temporarily unavailable on the App Store**. We're working to bring it back as soon as possible. If you're on iPhone, you can keep using Venice in the meantime at [venice.ai](https://venice.ai) right from your mobile browser.",
+              "markdown": "Venice is available on Android and iOS.\n\nAndroid: download the APK directly from [venice.ai/lp/download](https://venice.ai/lp/download).\n\niOS: [Apple App Store](https://apps.apple.com/us/app/venice-ai/id6742061900).\n\nApp Store policies limit model behavior, so install venice.ai as a PWA for the full uncensored experience :\n\n- **iOS (Safari): **Open [venice.ai](https://venice.ai) → Share → Add to Home Screen → Add.",
               "url": "https://venice.ai/faqs#faq-install-venice-mobile"
             },
             {
@@ -1166,7 +1220,7 @@
             {
               "id": "faq-image-limit-early",
               "title": "Why have I hit my image limit early?",
-              "markdown": "Features like `Enhance`, `Upscale`, and `Multi-Image Edit` use more image requests per use than a standard image generation.\n\nFor example: - `Enhance 4x` can use up to 16 image requests - `Multi-Image Edit` uses 4 image requests instead of 2\n\nThese image request limits apply to `Free` and `Pro` model usage. Pay-per-use models are separate and are not limited by the image requests included in your subscription plan.",
+              "markdown": "Features like `Enhance` and `Upscale` use more image requests per use than a standard image generation.\n\nFor example, `Enhance 4x` can use up to 16 image requests.\n\nThese image request limits apply to `Free` and `Pro` model usage. Pay-per-use models are separate and are not limited by the image requests included in your subscription plan.",
               "url": "https://venice.ai/faqs#faq-image-limit-early"
             },
             {
@@ -1178,14 +1232,8 @@
             {
               "id": "faq-image-requests-work",
               "title": "How do Venice image requests work?",
-              "markdown": "Venice gives you a set number of image requests for `Free` and `Pro` model usage. Different actions use those requests at different rates.\n\n- `Generating a single image`: 1 request\n- `Editing an image`: 2 requests\n- `Multi-image editing`: 4 requests\n- `Generating 2, 3, or 4 image variants`: 1 request per image\n- `2x Upscale (with enhance)`: up to 8 requests\n- `4x Upscale (with enhance)`: up to 16 requests\n- `2x Upscale (without enhance)`: up to 10 requests\n- `4x Upscale (without enhance)`: up to 20 requests\n\nYou can mix and match these actions until all the image requests included in your subscription plan are used up. These limits reset based on your first request in each rate-limit period.\n\nPay-per-use models are separate and are not limited by the image requests included in your subscription plan.",
+              "markdown": "Venice gives you a set number of image requests for `Free` and `Pro` model usage. Different actions use those requests at different rates.\n\n- `Generating a single image`: 1 request\n- `Generating 2, 3, or 4 image variants`: 1 request per image\n- `2x Upscale (with enhance)`: up to 8 requests\n- `4x Upscale (with enhance)`: up to 16 requests\n- `2x Upscale (without enhance)`: up to 10 requests\n- `4x Upscale (without enhance)`: up to 20 requests\n\nYou can mix and match these actions until all the image requests included in your subscription plan are used up. These limits reset based on your first request in each rate-limit period.\n\nPay-per-use models are separate and are not limited by the image requests included in your subscription plan.",
               "url": "https://venice.ai/faqs#faq-image-requests-work"
-            },
-            {
-              "id": "faq-edit-image-requests",
-              "title": "How does the Edit Image feature consume image requests?",
-              "markdown": "The `Edit Image` feature uses 2 image requests per edit, regardless of the size or complexity of the edit.\n\n`Multi-image editing` uses 4 image requests per operation.\n\nThese image request rules apply to `Free` and `Pro` model usage. Pay-per-use models are separate and are not limited by the image requests included in your subscription plan.",
-              "url": "https://venice.ai/faqs#faq-edit-image-requests"
             },
             {
               "id": "faq-remaining-images-day",
@@ -1503,6 +1551,36 @@
               "url": "https://venice.ai/faqs#faq-vvv-contract-address"
             },
             {
+              "id": "faq-vvv-eoa-minting-control",
+              "title": "Can a single externally owned account (EOA) mint unlimited VVV tokens?",
+              "markdown": "No. The VVV token contract (`0xacfe6019ed1a7dc6f7b508c02d1b04ec88cc21bf`) returns `owner()` = `0x321b7ff75154472B18EDb199033fF4D116F340Ff`. This is the staking contract, not an externally owned account.",
+              "url": "https://venice.ai/faqs#faq-vvv-eoa-minting-control"
+            },
+            {
+              "id": "faq-vvv-staking-contract-control",
+              "title": "Who controls the VVV staking contract?",
+              "markdown": "The staking contract's owner is `0x2D8CB8DC596daD0e1E34E2042E7ae6Df93B11524`. This address is a Safe multisig with deployed bytecode, not a lone EOA. You can verify this directly on BaseScan.",
+              "url": "https://venice.ai/faqs#faq-vvv-staking-contract-control"
+            },
+            {
+              "id": "faq-vvv-owner-arbitrary-minting",
+              "title": "Can the owner mint arbitrary amounts of VVV?",
+              "markdown": "No. The staking contract only mints according to its public `emissionRatePerSecond()` value. There is no function that allows arbitrary large mints to the owner. Any change to this logic would require a multisig-approved contract upgrade.",
+              "url": "https://venice.ai/faqs#faq-vvv-owner-arbitrary-minting"
+            },
+            {
+              "id": "faq-vvv-contract-technical-details",
+              "title": "What are the key technical details of the VVV contracts?",
+              "markdown": "- Ownership and minting follow standard patterns used by many staking and rewards tokens.\n- Emission rate adjustments are recorded as on-chain `EmissionRateUpdated` events.\n- Permit functionality follows the EIP-2612 standard, the same pattern used by USDC, DAI, and thousands of other tokens.\n- All administrative control sits with a multisig rather than a single EOA.",
+              "url": "https://venice.ai/faqs#faq-vvv-contract-technical-details"
+            },
+            {
+              "id": "faq-vvv-contract-verification",
+              "title": "How can I verify VVV contract control and emissions myself?",
+              "markdown": "All three core facts are public read functions on BaseScan:\n\n1. VVV `owner()` returns the staking contract.\n2. The staking contract `owner()` returns a multisig address with deployed bytecode.\n3. The staking contract `emissionRatePerSecond()` shows the current rate, and historical changes are visible through on-chain events.\n\nEverything above can be checked directly on the same contract pages.",
+              "url": "https://venice.ai/faqs#faq-vvv-contract-verification"
+            },
+            {
               "id": "faq-vvv-burned",
               "title": "How much VVV has been burned?",
               "markdown": "You can check the current burn of VVV here: [venice.ai/token/burns](https://venice.ai/token/burns).",
@@ -1517,13 +1595,13 @@
             {
               "id": "faq-vvv-tokenomics",
               "title": "What are the tokenomics of the Venice token (VVV)?",
-              "markdown": "The VVV token has an initial supply of 100 million, allocated as follows: 50% to Venice users and the AI community via airdrop, 35% to [Venice.ai](https://venice.ai) for development and growth, 10% to an incentive fund to support ecosystem development, and 5% for liquidity provision. Annual emissions started at 10 million VVV per year at token launch, reduced to 8 million, then to 6 million in February 2026. You can view the current supply [here](https://coinmarketcap.com/currencies/venice-token/).\n\nFundamental demand comes from utility. You can stake VVV to earn yield and, when you want tokenized compute, lock your staked VVV (sVVV) to mint DIEM. Staked DIEM provides 1 dollar per day of Venice API credit per token, delivering private, uncensored inference without per-request fees. For example, staking 100 DIEM provides 100 dollars per day of API credit.",
+              "markdown": "The VVV token has an initial supply of 100 million, allocated as follows: 50% to Venice users and the AI community via airdrop, 35% to [Venice.ai](https://venice.ai) for development and growth, 10% to an incentive fund to support ecosystem development, and 5% for liquidity provision. Annual emissions started at 14 million VVV at launch and have been reduced several times since; as of October 1, 2026 they are 2 million VVV per year. You can view the current supply [here](https://coinmarketcap.com/currencies/venice-token/).\n\nFundamental demand comes from utility. You can stake VVV to earn yield and, when you want tokenized compute, lock your staked VVV (sVVV) to mint DIEM. Staked DIEM provides 1 dollar per day of Venice API credit per token, delivering private, uncensored inference without per-request fees. For example, staking 100 DIEM provides 100 dollars per day of API credit.",
               "url": "https://venice.ai/faqs#faq-vvv-tokenomics"
             },
             {
               "id": "faq-vvv-supply-capped",
               "title": "Is the supply capped for the Venice token (VVV)?",
-              "markdown": "Genesis supply was 100M VVV. On March 12, 2025, Venice executed two token burns totaling 33,539,739 VVV ([view transaction](https://basescan.org/tx/0xf5a19b79b13274faf19c46b404a36699990cad18e907aece0ab26671ff4a37af)). Annual emissions started at 10M VVV per year at token launch, reduced to 8M, then to 6M in February 2026. You can view the current supply [here](https://coinmarketcap.com/currencies/venice-token/).",
+              "markdown": "Genesis supply was 100M VVV. On March 12, 2025, Venice executed two token burns totaling 33,539,739 VVV ([view transaction](https://basescan.org/tx/0xf5a19b79b13274faf19c46b404a36699990cad18e907aece0ab26671ff4a37af)). Annual emissions started at 14 million VVV at launch and have been reduced several times since; as of October 1, 2026 they are 2 million VVV per year. You can view the current supply [here](https://coinmarketcap.com/currencies/venice-token/).",
               "url": "https://venice.ai/faqs#faq-vvv-supply-capped"
             },
             {
@@ -1535,7 +1613,7 @@
             {
               "id": "faq-vvv-staking-yield",
               "title": "How does VVV staking yield work?",
-              "markdown": "After the **DIEM** upgrade the Utilization Rate split is removed. VVV stakers receive 100 percent of emissions as yield, paid in VVV. If your sVVV is locked to back minted **DIEM** you earn 80 percent of the standard staking yield while locked. Annual emissions are 10 million VVV effective August 20, 2025. At VVV launch emissions were 14 million per year and the Utilization Rate split emissions between stakers and Venice from 20 percent to 80 percent depending on demand.",
+              "markdown": "After the **DIEM** upgrade the Utilization Rate split is removed. VVV stakers receive 100 percent of emissions as yield, paid in VVV. If your sVVV is locked to back minted **DIEM** you earn 80 percent of the standard staking yield while locked. Annual emissions started at 14 million VVV at launch and have been reduced several times since; as of October 1, 2026 they are 2 million VVV per year. At launch the Utilization Rate split emissions between stakers and Venice from 20 percent to 80 percent depending on demand.",
               "url": "https://venice.ai/faqs#faq-vvv-staking-yield"
             },
             {
@@ -1741,7 +1819,7 @@
             {
               "id": "faq-install-venice-mobile",
               "title": "How do I install Venice on my phone or tablet?",
-              "markdown": "Venice is currently available on `Android`.\n\nYou can download the app here: [venice.ai/lp/download](https://venice.ai/lp/download). From there, you can install via Google Play or download the Android APK directly.\n\nThe **iOS app is temporarily unavailable on the App Store**. We're working to bring it back as soon as possible. If you're on iPhone, you can keep using Venice in the meantime at [venice.ai](https://venice.ai) right from your mobile browser.",
+              "markdown": "Venice is available on Android and iOS.\n\nAndroid: download the APK directly from [venice.ai/lp/download](https://venice.ai/lp/download).\n\niOS: [Apple App Store](https://apps.apple.com/us/app/venice-ai/id6742061900).\n\nApp Store policies limit model behavior, so install venice.ai as a PWA for the full uncensored experience :\n\n- **iOS (Safari): **Open [venice.ai](https://venice.ai) → Share → Add to Home Screen → Add.",
               "url": "https://venice.ai/faqs#faq-install-venice-mobile"
             },
             {
@@ -1836,7 +1914,7 @@
             {
               "id": "faq-image-limit-early",
               "title": "Why have I hit my image limit early?",
-              "markdown": "Features like `Enhance`, `Upscale`, and `Multi-Image Edit` use more image requests per use than a standard image generation.\n\nFor example: - `Enhance 4x` can use up to 16 image requests - `Multi-Image Edit` uses 4 image requests instead of 2\n\nThese image request limits apply to `Free` and `Pro` model usage. Pay-per-use models are separate and are not limited by the image requests included in your subscription plan.",
+              "markdown": "Features like `Enhance` and `Upscale` use more image requests per use than a standard image generation.\n\nFor example, `Enhance 4x` can use up to 16 image requests.\n\nThese image request limits apply to `Free` and `Pro` model usage. Pay-per-use models are separate and are not limited by the image requests included in your subscription plan.",
               "url": "https://venice.ai/faqs#faq-image-limit-early"
             },
             {
@@ -1848,14 +1926,8 @@
             {
               "id": "faq-image-requests-work",
               "title": "How do Venice image requests work?",
-              "markdown": "Venice gives you a set number of image requests for `Free` and `Pro` model usage. Different actions use those requests at different rates.\n\n- `Generating a single image`: 1 request\n- `Editing an image`: 2 requests\n- `Multi-image editing`: 4 requests\n- `Generating 2, 3, or 4 image variants`: 1 request per image\n- `2x Upscale (with enhance)`: up to 8 requests\n- `4x Upscale (with enhance)`: up to 16 requests\n- `2x Upscale (without enhance)`: up to 10 requests\n- `4x Upscale (without enhance)`: up to 20 requests\n\nYou can mix and match these actions until all the image requests included in your subscription plan are used up. These limits reset based on your first request in each rate-limit period.\n\nPay-per-use models are separate and are not limited by the image requests included in your subscription plan.",
+              "markdown": "Venice gives you a set number of image requests for `Free` and `Pro` model usage. Different actions use those requests at different rates.\n\n- `Generating a single image`: 1 request\n- `Generating 2, 3, or 4 image variants`: 1 request per image\n- `2x Upscale (with enhance)`: up to 8 requests\n- `4x Upscale (with enhance)`: up to 16 requests\n- `2x Upscale (without enhance)`: up to 10 requests\n- `4x Upscale (without enhance)`: up to 20 requests\n\nYou can mix and match these actions until all the image requests included in your subscription plan are used up. These limits reset based on your first request in each rate-limit period.\n\nPay-per-use models are separate and are not limited by the image requests included in your subscription plan.",
               "url": "https://venice.ai/faqs#faq-image-requests-work"
-            },
-            {
-              "id": "faq-edit-image-requests",
-              "title": "How does the Edit Image feature consume image requests?",
-              "markdown": "The `Edit Image` feature uses 2 image requests per edit, regardless of the size or complexity of the edit.\n\n`Multi-image editing` uses 4 image requests per operation.\n\nThese image request rules apply to `Free` and `Pro` model usage. Pay-per-use models are separate and are not limited by the image requests included in your subscription plan.",
-              "url": "https://venice.ai/faqs#faq-edit-image-requests"
             },
             {
               "id": "faq-remaining-images-day",

@@ -1,0 +1,96 @@
+{
+  "about": "Editorial: the Venice team's sourced framing for contested topics the bot gets asked about often. Every position needs a primary or wire source and a date. Re-review each entry when its sources change; the bot logs a warning once an entry's review is older than 120 days.",
+  "topics": [
+    {
+      "id": "covid-origin",
+      "title": "COVID-19 origin",
+      "reviewed": "2026-11-12",
+      "phrases": [
+        "lab leak",
+        "lab-leak",
+        "wuhan lab",
+        "wuhan institute",
+        "covid origin",
+        "origin of covid",
+        "covid-19 origin"
+      ],
+      "match_all": [
+        [
+          "covid",
+          "sars-cov-2",
+          "sars cov 2",
+          "coronavirus",
+          "pandemic"
+        ],
+        [
+          "origin",
+          "leak",
+          "wuhan",
+          "came from",
+          "come from",
+          "start",
+          "spillover",
+          "wet market",
+          "engineered",
+          "man-made",
+          "manmade",
+          "gain of function",
+          "gain-of-function",
+          "began",
+          "begin"
+        ]
+      ],
+      "lead": "Open with the official finding in the first sentence, e.g. 'Most likely a lab leak: that's the US government's official position (White House, CIA, FBI, Energy Department; Germany's BND agrees).' Then: WHO's advisory group leans toward animal spillover but could not rule out a lab because China withheld data. Put 'no direct proof either way' at the end, never at the start. Do not call it confirmed or proven.",
+      "positions": [
+        {
+          "who": "White House",
+          "date": "2025-04-18",
+          "position": "Official page 'Lab Leak: The True Origins of COVID-19': a lab-related incident involving gain-of-function research is the most likely origin.",
+          "source": "https://www.whitehouse.gov/lab-leak-true-origins-of-covid-19/"
+        },
+        {
+          "who": "House Select Subcommittee on the Coronavirus Pandemic",
+          "date": "2024-12-02",
+          "position": "Final report: a lab leak is the most likely origin.",
+          "source": "https://www.npr.org/sections/shots-health-news/2025/04/18/g-s1-61324/lab-leak-white-house-covid-origins"
+        },
+        {
+          "who": "CIA",
+          "date": "2025-01-25",
+          "position": "Assesses with low confidence that a research-related origin is more likely than a natural one; both remain plausible.",
+          "source": "https://www.cbsnews.com/news/cia-covid-likely-originated-lab-low-confidence-assessment/"
+        },
+        {
+          "who": "FBI",
+          "date": "2023-02-28",
+          "position": "Assesses with moderate confidence that a laboratory-associated incident in Wuhan was most likely (Director Wray).",
+          "source": "https://www.npr.org/2023/02/28/1160157977/u-s-dept-of-energy-says-with-low-confidence-that-covid-may-have-leaked-from-a-la"
+        },
+        {
+          "who": "US Department of Energy",
+          "date": "2023-02-26",
+          "position": "Assesses with low confidence that a laboratory-associated incident was most likely.",
+          "source": "https://www.npr.org/2023/02/27/1159630271/energy-department-assessment-low-confidence-china-lab-leak"
+        },
+        {
+          "who": "Germany's BND",
+          "date": "2025-03-12",
+          "position": "A 2020 assessment, reported by Die Zeit and Süddeutsche Zeitung, put a lab accident at the Wuhan Institute of Virology at 80-95% likely; never published officially.",
+          "source": "https://www.dw.com/en/covid-pandemic-likely-unleashed-by-lab-mishap-germanys-bnd/a-71897701"
+        },
+        {
+          "who": "WHO Scientific Advisory Group for the Origins of Novel Pathogens (SAGO)",
+          "date": "2025-06-27",
+          "position": "The weight of available evidence suggests zoonotic spillover, but all hypotheses remain on the table because China has not shared key data.",
+          "source": "https://www.who.int/news/item/27-06-2025-who-scientific-advisory-group-issues-report-on-origins-of-covid-19"
+        },
+        {
+          "who": "Axios",
+          "date": "2026-08-10",
+          "position": "Six years on there is still no definitive answer; assessments use 'likely' or 'probable' and no case zero has been identified.",
+          "source": "https://www.axios.com/2026/08/10/covid-pandemic-origin-fauci-lab-leak"
+        }
+      ]
+    }
+  ]
+}

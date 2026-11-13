@@ -107,6 +107,10 @@ def get_models(type=None):
     return data
 
 
+# Most replies run on this model, so its absence is CRITICAL rather than ERROR.
+PRIMARY_ROLE = "MODEL_UNBIASED"
+
+
 def missing_configured_models(available_ids):
     """Return {role: model_id} for configured models absent from `available_ids`.
 
@@ -145,17 +149,17 @@ def validate_configured_models():
         return {}
 
     for role, mid in missing.items():
-        level = logging.CRITICAL if role == "MODEL_PRIMARY" else logging.ERROR
+        level = logging.CRITICAL if role == PRIMARY_ROLE else logging.ERROR
         logger.log(
             level,
             "Configured %s=%r is NOT in Venice's available model list — calls "
             "using it will fail. Update config.py.",
             role, mid,
         )
-    if "MODEL_PRIMARY" in missing:
+    if PRIMARY_ROLE in missing:
         logger.critical(
-            "PRIMARY model is unavailable — every reply will degrade to a fallback. "
-            "Fix config.py immediately."
+            "PRIMARY model (the unbiased lane) is unavailable — every reply will "
+            "degrade to a fallback. Fix config.py immediately."
         )
     return missing
 
@@ -192,3 +196,60 @@ def summarize_models(models, limit=30):
     if len(models) > limit:
         lines.append(f"...and {len(models) - limit} more models (ask about a specific model or type for details)")
     return "\n".join(lines)
+
+
+# ── Contested topics (editorial fact sheet) ──────────────────
+_facts_cache = None
+FACTS_STALE_DAYS = 120
+
+
+def _load_contested_facts():
+    global _facts_cache
+    if _facts_cache is None:
+        try:
+            with open(os.path.join(_DIR, Config.CONTESTED_FACTS_FILE), encoding="utf-8") as f:
+                _facts_cache = json.load(f).get("topics", [])
+        except Exception as e:
+            logger.warning(f"Contested-facts sheet unavailable ({e})")
+            _facts_cache = []
+    return _facts_cache
+
+
+def relevant_positions(text):
+    """Fact-sheet topics that `text` is about: any phrase, or a hit in every match_all group."""
+    t = (text or "").lower()
+    hits = []
+    for topic in _load_contested_facts():
+        by_phrase = any(p in t for p in topic.get("phrases", []))
+        groups = topic.get("match_all") or []
+        by_groups = bool(groups) and all(any(k in t for k in group) for group in groups)
+        if by_phrase or by_groups:
+            hits.append(topic)
+    return hits
+
+
+def format_positions(topic):
+    lines = [f"TOPIC: {topic['title']} (reviewed {topic['reviewed']})", f"LEAD: {topic['lead']}", "POSITIONS:"]
+    lines += [f"- {p['who']} ({p['date']}): {p['position']}" for p in topic.get("positions", [])]
+    return "\n".join(lines)
+
+
+def position_evidence(topic):
+    """The topic's positions as evidence lines for the reply gate."""
+    return [f"[fact sheet] {p['who']} ({p['date']}): {p['position']} {p['source']}" for p in topic.get("positions", [])]
+
+
+def stale_fact_topics(today=None):
+    """Topic ids whose review is older than FACTS_STALE_DAYS."""
+    from datetime import date
+    today = today or date.today()
+    stale = []
+    for topic in _load_contested_facts():
+        try:
+            reviewed = date.fromisoformat(topic["reviewed"])
+        except (KeyError, ValueError):
+            stale.append(topic.get("id", "?"))
+            continue
+        if (today - reviewed).days > FACTS_STALE_DAYS:
+            stale.append(topic["id"])
+    return stale
