@@ -428,13 +428,14 @@ def analyse(
                 evidence.extend(position_evidence(t))
 
     length_rule = (
-        f"LENGTH: most replies are one or two sentences. Keep the text inside [FINAL_REPLY] "
-        f"under {target} characters; shorter is better. Don't mention the length."
+        f"LENGTH: most replies are two to four short sentences. Keep the text inside "
+        f"[FINAL_REPLY] under {target} characters; shorter is better. If it doesn't fit, "
+        f"drop a fact instead of squeezing the wording. Don't mention the length."
     )
     msg += (
         f"\n\nOUTPUT (strict):\n"
         f"[FINAL_REPLY]\n"
-        f"<your tweet-ready reply, plain text, no greetings/hashtags/markdown>\n"
+        f"<your reply in plain language, plain text, no greetings/hashtags/markdown>\n"
         f"[/FINAL_REPLY]\n\n"
         f"[NOTES]\n(optional) key facts/sources used\n[/NOTES]\n\n"
         f"{length_rule}"

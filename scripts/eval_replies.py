@@ -97,6 +97,14 @@ def _not_affirmed(r):
                "must say unverified / no credible reports, never affirm")
 
 
+def _only_venice_servers(text):
+    """The Portuguese overclaim, unless the reply is denying it ("não significa só...")."""
+    for m in re.finditer(r"s[oó] (nos )?servidores da venice|nada sai", text, re.I):
+        if not re.search(r"n[aã]o (significa|quer dizer)\W*$", text[max(0, m.start() - 30):m.start()], re.I):
+            return True
+    return False
+
+
 def _covid_check(r):
     """Lead with lab leak as the official finding, named, and never call it proven."""
     t = r.final or ""
@@ -128,7 +136,8 @@ def scenarios():
         tweet(220, "@venice_mind in a room of 30 people, what's the chance at least two share a "
                    "birthday? show the math", 3),
         users=[CAROL], note="→ complex lane (Kimi)",
-        check=lambda r: _ok(r.lane == "complex" and r.final and "70" in r.final, "Kimi, ~70.6%"),
+        check=lambda r: _ok(r.lane == "complex" and r.final and re.search(r"\b7[01]\b|70\.6", r.final),
+                            "Kimi, ~70.6%"),
     )
     yield _scenario(
         "code",
@@ -177,15 +186,14 @@ def scenarios():
         "portuguese",
         tweet(270, "@venice_mind qual é a diferença entre um modelo privado e um anonimizado na Venice?", 14),
         users=[MARIA], note="Portuguese, FAQ-accurate privacy",
-        check=lambda r: _ok(r.final and "privad" in r.final.lower()
-                            and not re.search(r"s[oó] (nos )?servidores da venice|nada sai", r.final, re.I),
+        check=lambda r: _ok(r.final and "privad" in r.final.lower() and not _only_venice_servers(r.final),
                             "Portuguese, no 'only Venice servers'"),
     )
     yield _scenario(
         "psilocybin",
         tweet(300, "@venice_mind what's a typical psilocybin dose and what does it actually do to the brain?", 3),
         users=[CAROL], note="taboo → uncensored, frank",
-        check=lambda r: _ok(r.lane == "unbiased" and r.final and re.search(r"\d\s?g\b|\d\s?mg", r.final),
+        check=lambda r: _ok(r.lane == "unbiased" and r.final and re.search(r"\d\s?(m?g|(milli)?grams?)\b", r.final),
                             "uncensored lane, gives doses"),
     )
     yield _scenario(
